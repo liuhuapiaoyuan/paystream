@@ -1,12 +1,21 @@
 {
   "name": "paystream",
-  "version": "1.0.0",
-  "description": "统一支付抽象库 - 支持微信支付和支付宝回调处理",
+  "version": "2.0.0",
+  "description": "PayStream V2 - 现代化的 TypeScript 统一支付回调处理库，采用面向对象架构",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -17,7 +26,10 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
     "type-check": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm build",
+    "release": "pnpm build && npm publish",
+    "release:beta": "pnpm build && npm publish --tag beta",
+    "release:alpha": "pnpm build && npm publish --tag alpha"
   },
   "keywords": [
     "payment",
@@ -25,10 +37,26 @@
     "alipay",
     "callback",
     "typescript",
-    "nodejs"
+    "nodejs",
+    "provider",
+    "oop",
+    "nextjs",
+    "webhook"
   ],
   "author": "PayStream Contributors",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/paystream.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/paystream/issues"
+  },
+  "homepage": "https://github.com/your-username/paystream#readme",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dependencies": {
     "crypto": "^1.0.1"
   },
