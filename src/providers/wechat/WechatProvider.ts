@@ -396,85 +396,28 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
         throw new Error('notify_url 是必需的');
       }
 
-      // 构建微信支付订单参数
-      const baseParams = {
-        appid: this.config.appId,
-        mchid: this.config.mchId,
-        description: request.subject,
-        out_trade_no: request.outTradeNo,
-        notify_url: request.notifyUrl,
-        amount: {
-          total: request.totalAmount, // 单位为分
-          currency: 'CNY',
-        },
-        attach: request.body,
-        // 处理时间过期，转换为 ISO 时间字符串
-        ...(request.timeExpire && {
-          time_expire: new Date(
-            Date.now() + request.timeExpire * 60 * 1000
-          ).toISOString(),
-        }),
-      };
-
       let result: any;
       const paymentData: any = {};
 
       switch (wechatMethod) {
-        case 'native': {
-          const params: WechatNativeOrderParams = {
-            ...baseParams,
-            scene_info: {
-              payer_client_ip: request.clientIp || '127.0.0.1',
-            },
-          };
-          result = await this.wechatClient.createNativeOrder(params);
+        case 'native':
+          result = await this.createNativePayment(request);
           paymentData.qrCode = result.code_url;
           break;
-        }
 
-        case 'jsapi': {
-          if (!request.openid) {
-            throw new Error('JSAPI支付需要提供openid');
-          }
-          const params: WechatJSAPIOrderParams = {
-            ...baseParams,
-            payer: {
-              openid: request.openid,
-            },
-            scene_info: {
-              payer_client_ip: request.clientIp || '127.0.0.1',
-            },
-          };
-          result = await this.wechatClient.createJSAPIOrder(params);
-          // 生成前端支付参数
+        case 'jsapi':
+          result = await this.createJSAPIPayment(request);
           paymentData.payParams = generateJSAPIPayParams(
             this.config.appId,
             result.prepay_id,
             this.config.privateKey
           );
           break;
-        }
 
-        case 'h5': {
-          const wechatRequest = request as WechatCreateOrderRequest;
-          const params: WechatH5OrderParams = {
-            ...baseParams,
-            scene_info: {
-              payer_client_ip: request.clientIp || '127.0.0.1',
-              h5_info: {
-                type: 'Wap',
-                app_name:
-                  wechatRequest.sceneInfo?.h5Info?.appName || 'PayStream',
-                app_url:
-                  wechatRequest.sceneInfo?.h5Info?.appUrl ||
-                  'https://example.com',
-              },
-            },
-          };
-          result = await this.wechatClient.createH5Order(params);
+        case 'h5':
+          result = await this.createH5Payment(request);
           paymentData.payUrl = result.h5_url;
           break;
-        }
 
         default:
           throw new Error(`不支持的微信支付方式: ${wechatMethod}`);
@@ -492,6 +435,83 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
         error: error instanceof Error ? error.message : '创建订单失败',
       };
     }
+  }
+
+  /**
+   * 创建 Native 支付订单
+   */
+  private async createNativePayment(request: CreateOrderRequest) {
+    const params: WechatNativeOrderParams = {
+      ...this.buildBaseOrderParams(request),
+      scene_info: {
+        payer_client_ip: request.clientIp || '127.0.0.1',
+      },
+    };
+    return await this.wechatClient.createNativeOrder(params);
+  }
+
+  /**
+   * 创建 JSAPI 支付订单
+   */
+  private async createJSAPIPayment(request: CreateOrderRequest) {
+    if (!request.openid) {
+      throw new Error('JSAPI支付需要提供openid');
+    }
+
+    const params: WechatJSAPIOrderParams = {
+      ...this.buildBaseOrderParams(request),
+      payer: {
+        openid: request.openid,
+      },
+      scene_info: {
+        payer_client_ip: request.clientIp || '127.0.0.1',
+      },
+    };
+    return await this.wechatClient.createJSAPIOrder(params);
+  }
+
+  /**
+   * 创建 H5 支付订单
+   */
+  private async createH5Payment(request: CreateOrderRequest) {
+    const wechatRequest = request as WechatCreateOrderRequest;
+    const params: WechatH5OrderParams = {
+      ...this.buildBaseOrderParams(request),
+      scene_info: {
+        payer_client_ip: request.clientIp || '127.0.0.1',
+        h5_info: {
+          type: 'Wap',
+          app_name: wechatRequest.sceneInfo?.h5Info?.appName || 'PayStream',
+          app_url:
+            wechatRequest.sceneInfo?.h5Info?.appUrl || 'https://example.com',
+        },
+      },
+    };
+    return await this.wechatClient.createH5Order(params);
+  }
+
+  /**
+   * 构建基础订单参数
+   */
+  private buildBaseOrderParams(request: CreateOrderRequest) {
+    return {
+      appid: this.config.appId,
+      mchid: this.config.mchId,
+      description: request.subject,
+      out_trade_no: request.outTradeNo,
+      notify_url: request.notifyUrl!,
+      amount: {
+        total: request.totalAmount, // 单位为分
+        currency: 'CNY',
+      },
+      attach: request.body,
+      // 处理时间过期，转换为 ISO 时间字符串
+      ...(request.timeExpire && {
+        time_expire: new Date(
+          Date.now() + request.timeExpire * 60 * 1000
+        ).toISOString(),
+      }),
+    };
   }
 
   /**

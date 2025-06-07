@@ -115,6 +115,8 @@ export {
   type AlipayTradeRefundQueryResponse,
 } from './utils/alipay';
 
+export * from './adapters/nextjsV2';
+
 /**
  * 创建微信支付Provider
  */

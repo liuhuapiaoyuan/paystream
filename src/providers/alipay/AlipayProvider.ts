@@ -438,7 +438,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   ): Promise<CreateOrderResponse> {
     try {
       const alipayMethod = method.replace('alipay.', '') as AlipayMethod;
-
+      
       if (!this.supportedMethods.includes(alipayMethod)) {
         throw new Error(`不支持的支付方式: ${method}`);
       }
@@ -447,73 +447,25 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
       const paymentData: any = {};
 
       switch (alipayMethod) {
-        case 'qrcode': {
-          const params: AlipayTradeCreateParams = {
-            out_trade_no: request.outTradeNo,
-            total_amount: (request.totalAmount / 100).toString(), // 转换为元
-            subject: request.subject,
-            body: request.body,
-            product_code: 'FACE_TO_FACE_PAYMENT',
-            timeout_express: request.timeExpire
-              ? `${request.timeExpire}m`
-              : '30m',
-          };
-
-          result = await this.alipayClient.tradeCreate(params);
+        case 'qrcode':
+          result = await this.createQrcodePayment(request);
           paymentData.qrCode = `https://qr.alipay.com/${result.qr_code}`;
           break;
-        }
 
-        case 'h5': {
-          const params: AlipayTradeWapPayParams = {
-            out_trade_no: request.outTradeNo,
-            total_amount: (request.totalAmount / 100).toString(),
-            subject: request.subject,
-            body: request.body,
-            product_code: 'QUICK_WAP_WAY',
-            time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
-            quit_url: request.returnUrl || 'https://example.com',
-          };
-
-          const formHtml = await this.alipayClient.tradeWapPay(params);
-          paymentData.payUrl = formHtml; // 这里应该是提取的URL
+        case 'h5':
+          result = await this.createH5Payment(request);
+          paymentData.payUrl = result; // H5支付返回URL
           break;
-        }
 
-        case 'pc': {
-          const params: AlipayTradePagePayParams = {
-            out_trade_no: request.outTradeNo,
-            total_amount: (request.totalAmount / 100).toString(),
-            subject: request.subject,
-            body: request.body,
-            product_code: 'FAST_INSTANT_TRADE_PAY',
-            time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
-            return_url: request.returnUrl,
-            notify_url: request.notifyUrl,
-          };
-
-          const formHtml = await this.alipayClient.tradePagePay(params);
-          paymentData.payForm = formHtml;
+        case 'pc':
+          result = await this.createPCPayment(request);
+          paymentData.payForm = result; // PC支付返回表单HTML
           break;
-        }
 
-        case 'app': {
-          // APP支付暂时使用二维码支付的逻辑
-          const params: AlipayTradeCreateParams = {
-            out_trade_no: request.outTradeNo,
-            total_amount: (request.totalAmount / 100).toString(),
-            subject: request.subject,
-            body: request.body,
-            product_code: 'QUICK_MSECURITY_PAY',
-            timeout_express: request.timeExpire
-              ? `${request.timeExpire}m`
-              : '30m',
-          };
-
-          result = await this.alipayClient.tradeCreate(params);
+        case 'app':
+          result = await this.createAppPayment(request);
           paymentData.orderInfo = result; // APP支付返回订单信息
           break;
-        }
 
         default:
           throw new Error(`不支持的支付宝支付方式: ${alipayMethod}`);
@@ -531,6 +483,73 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
         error: error instanceof Error ? error.message : '创建订单失败',
       };
     }
+  }
+
+  /**
+   * 创建二维码支付订单
+   */
+  private async createQrcodePayment(request: CreateOrderRequest) {
+    const params: AlipayTradeCreateParams = {
+      out_trade_no: request.outTradeNo,
+      total_amount: (request.totalAmount / 100).toString(), // 转换为元
+      subject: request.subject,
+      body: request.body,
+      product_code: 'FACE_TO_FACE_PAYMENT',
+      timeout_express: request.timeExpire ? `${request.timeExpire}m` : '30m',
+    };
+    
+    return await this.alipayClient.tradeCreate(params);
+  }
+
+  /**
+   * 创建H5支付订单
+   */
+  private async createH5Payment(request: CreateOrderRequest) {
+    const params: AlipayTradeWapPayParams = {
+      out_trade_no: request.outTradeNo,
+      total_amount: (request.totalAmount / 100).toString(),
+      subject: request.subject,
+      body: request.body,
+      product_code: 'QUICK_WAP_WAY',
+      time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
+      quit_url: request.returnUrl || 'https://example.com',
+    };
+    
+    return await this.alipayClient.tradeWapPay(params);
+  }
+
+  /**
+   * 创建PC支付订单
+   */
+  private async createPCPayment(request: CreateOrderRequest) {
+    const params: AlipayTradePagePayParams = {
+      out_trade_no: request.outTradeNo,
+      total_amount: (request.totalAmount / 100).toString(),
+      subject: request.subject,
+      body: request.body,
+      product_code: 'FAST_INSTANT_TRADE_PAY',
+      time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
+      return_url: request.returnUrl,
+      notify_url: request.notifyUrl,
+    };
+    
+    return await this.alipayClient.tradePagePay(params);
+  }
+
+  /**
+   * 创建APP支付订单
+   */
+  private async createAppPayment(request: CreateOrderRequest) {
+    const params: AlipayTradeCreateParams = {
+      out_trade_no: request.outTradeNo,
+      total_amount: (request.totalAmount / 100).toString(),
+      subject: request.subject,
+      body: request.body,
+      product_code: 'QUICK_MSECURITY_PAY',
+      timeout_express: request.timeExpire ? `${request.timeExpire}m` : '30m',
+    };
+    
+    return await this.alipayClient.tradeCreate(params);
   }
 
   /**
