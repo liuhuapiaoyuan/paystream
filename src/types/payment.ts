@@ -50,7 +50,7 @@ export type AlipayMethod = 'qrcode' | 'pc' | 'h5' | 'app';
 /**
  * 支付方式映射
  */
-export type PaymentMethod = 
+export type PaymentMethod =
   | `wechat.${WechatPayMethod}`
   | `alipay.${AlipayMethod}`;
 
@@ -109,11 +109,13 @@ export type HookEvent = 'onNotify' | 'onSuccess' | 'onFail' | 'onPending';
 /**
  * Hook 处理函数
  */
-export type HookHandler = (notification: UnifiedPaymentNotification) => void | Promise<void>;
+export type HookHandler = (
+  notification: UnifiedPaymentNotification
+) => void | Promise<void>;
 
 /**
  * Hook 配置
  */
 export interface HookConfig {
   [key: string]: HookHandler[];
-} 
+}

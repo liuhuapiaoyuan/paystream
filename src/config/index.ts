@@ -1,4 +1,9 @@
-import { PaymentConfig, WechatPayConfig, AlipayConfig, EnvConfig } from '../types/config';
+import {
+  PaymentConfig,
+  WechatPayConfig,
+  AlipayConfig,
+  EnvConfig,
+} from '../types/config';
 import { PaymentError, PaymentErrorCode } from '../types/payment';
 
 /**
@@ -19,7 +24,7 @@ const defaultConfig: Partial<PaymentConfig> = {
  */
 export function loadConfigFromEnv(): Partial<PaymentConfig> {
   const env = process.env as unknown as EnvConfig;
-  
+
   const config: Partial<PaymentConfig> = {
     ...defaultConfig,
   };
@@ -77,7 +82,7 @@ export function loadConfigFromEnv(): Partial<PaymentConfig> {
  */
 export function validateWechatConfig(config: WechatPayConfig): void {
   const required = ['appId', 'mchId', 'apiV3Key', 'privateKey', 'serialNo'];
-  
+
   for (const key of required) {
     if (!config[key as keyof WechatPayConfig]) {
       throw new PaymentError(
@@ -94,7 +99,7 @@ export function validateWechatConfig(config: WechatPayConfig): void {
  */
 export function validateAlipayConfig(config: AlipayConfig): void {
   const required = ['appId', 'privateKey', 'alipayPublicKey'];
-  
+
   for (const key of required) {
     if (!config[key as keyof AlipayConfig]) {
       throw new PaymentError(
@@ -119,10 +124,10 @@ export function mergeConfig(
     wechat: { ...envConfig.wechat, ...userConfig.wechat },
     alipay: { ...envConfig.alipay, ...userConfig.alipay },
     hooks: { ...envConfig.hooks, ...userConfig.hooks },
-    global: { 
+    global: {
       ...defaultConfig.global,
-      ...envConfig.global, 
-      ...userConfig.global 
+      ...envConfig.global,
+      ...userConfig.global,
     },
   } as PaymentConfig;
 }
@@ -132,18 +137,20 @@ export function mergeConfig(
  * @param userConfig 用户配置
  * @returns 完整配置
  */
-export function getConfig(userConfig: Partial<PaymentConfig> = {}): PaymentConfig {
+export function getConfig(
+  userConfig: Partial<PaymentConfig> = {}
+): PaymentConfig {
   const envConfig = loadConfigFromEnv();
   const finalConfig = mergeConfig(userConfig, envConfig);
-  
+
   // 验证配置
   if (finalConfig.wechat?.enabled) {
     validateWechatConfig(finalConfig.wechat);
   }
-  
+
   if (finalConfig.alipay?.enabled) {
     validateAlipayConfig(finalConfig.alipay);
   }
-  
+
   return finalConfig;
-} 
+}

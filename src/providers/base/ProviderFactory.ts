@@ -4,14 +4,18 @@ import { PaymentError, PaymentErrorCode } from '../../types/payment';
 /**
  * Provider 构造函数类型
  */
-export type ProviderConstructor<TConfig extends BaseProviderConfig = BaseProviderConfig> = {
+export type ProviderConstructor<
+  TConfig extends BaseProviderConfig = BaseProviderConfig,
+> = {
   new (config: TConfig): BaseProvider<TConfig>;
 };
 
 /**
  * Provider 注册信息
  */
-export interface ProviderRegistration<TConfig extends BaseProviderConfig = BaseProviderConfig> {
+export interface ProviderRegistration<
+  TConfig extends BaseProviderConfig = BaseProviderConfig,
+> {
   /** Provider 构造函数 */
   constructor: ProviderConstructor<TConfig>;
   /** 默认配置 */
@@ -77,7 +81,9 @@ export class ProviderFactory {
     name: string,
     config: TConfig
   ): BaseProvider<TConfig> {
-    const registration = this.providers.get(name) as ProviderRegistration<TConfig>;
+    const registration = this.providers.get(
+      name
+    ) as ProviderRegistration<TConfig>;
     if (!registration) {
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_PROVIDER,
@@ -92,10 +98,10 @@ export class ProviderFactory {
     } as TConfig;
 
     const instance = new registration.constructor(finalConfig);
-    
+
     // 缓存实例
     this.instances.set(name, instance);
-    
+
     return instance;
   }
 
@@ -163,7 +169,9 @@ export class ProviderFactory {
    * @param configs Provider 配置映射
    * @returns 创建的实例映射
    */
-  createBatch(configs: Record<string, BaseProviderConfig>): Map<string, BaseProvider> {
+  createBatch(
+    configs: Record<string, BaseProviderConfig>
+  ): Map<string, BaseProvider> {
     const results = new Map<string, BaseProvider>();
 
     for (const [name, config] of Object.entries(configs)) {
@@ -214,4 +222,4 @@ export class ProviderFactory {
 /**
  * 默认工厂实例
  */
-export const defaultProviderFactory = ProviderFactory.getInstance(); 
+export const defaultProviderFactory = ProviderFactory.getInstance();

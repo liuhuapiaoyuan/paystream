@@ -1,12 +1,15 @@
-import { BaseProvider, BaseProviderConfig, VerifyResult } from '../base/BaseProvider';
-import { 
-  UnifiedPaymentNotification, 
-  PaymentNotifyPayload, 
-  PaymentError, 
+import {
+  BaseProvider,
+  BaseProviderConfig,
+  VerifyResult,
+} from '../base/BaseProvider';
+import {
+  UnifiedPaymentNotification,
+  PaymentNotifyPayload,
+  PaymentError,
   PaymentErrorCode,
-  AlipayMethod 
+  AlipayMethod,
 } from '../../types/payment';
-import { AlipayConfig } from '../../types/config';
 import { verifyWithRSA2, verifyWithRSA } from '../../utils/crypto';
 
 /**
@@ -84,7 +87,12 @@ export interface AlipayProviderConfig extends BaseProviderConfig {
  * 支付宝 Provider 实现
  */
 export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
-  private readonly supportedMethods: AlipayMethod[] = ['qrcode', 'pc', 'h5', 'app'];
+  private readonly supportedMethods: AlipayMethod[] = [
+    'qrcode',
+    'pc',
+    'h5',
+    'app',
+  ];
 
   constructor(config: AlipayProviderConfig) {
     super(config, 'alipay');
@@ -95,7 +103,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
    */
   protected validateConfig(): void {
     const required = ['appId', 'privateKey', 'alipayPublicKey'];
-    
+
     for (const key of required) {
       if (!this.config[key as keyof AlipayProviderConfig]) {
         throw new PaymentError(
@@ -135,9 +143,15 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
     }
 
     const params = payload.raw as AlipayNotifyParams;
-    
+
     // 检查必要字段
-    const requiredFields = ['notify_id', 'notify_type', 'trade_status', 'out_trade_no', 'trade_no'];
+    const requiredFields = [
+      'notify_id',
+      'notify_type',
+      'trade_status',
+      'out_trade_no',
+      'trade_no',
+    ];
     for (const field of requiredFields) {
       if (!params[field]) {
         throw new PaymentError(
@@ -159,16 +173,18 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   /**
    * 验证签名
    */
-  protected async verifySignature(payload: PaymentNotifyPayload): Promise<VerifyResult> {
+  protected async verifySignature(
+    payload: PaymentNotifyPayload
+  ): Promise<VerifyResult> {
     const params = payload.raw as AlipayNotifyParams;
     const { sign, sign_type } = params;
-    
+
     try {
       // 构建待验签字符串
       const signString = this.buildSignString(params);
-      
+
       let isValid = false;
-      
+
       // 根据签名类型选择验签方法
       if (sign_type === 'RSA2') {
         isValid = verifyWithRSA2(signString, sign, this.config.alipayPublicKey);
@@ -187,7 +203,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
         details: {
           signType: sign_type,
           signString: signString.substring(0, 100) + '...', // 只记录前100个字符
-        }
+        },
       };
     } catch (error) {
       return {
@@ -203,26 +219,31 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   private buildSignString(params: AlipayNotifyParams): string {
     // 过滤掉签名参数和空值参数
     const filteredParams: Record<string, string> = {};
-    
+
     Object.keys(params).forEach(key => {
-      if (key !== 'sign' && key !== 'sign_type' && params[key] !== '' && params[key] != null) {
+      if (
+        key !== 'sign' &&
+        key !== 'sign_type' &&
+        params[key] !== '' &&
+        params[key] != null
+      ) {
         filteredParams[key] = String(params[key]);
       }
     });
-    
+
     // 按键名升序排序
     const sortedKeys = Object.keys(filteredParams).sort();
-    
+
     // 构建查询字符串
-    return sortedKeys
-      .map(key => `${key}=${filteredParams[key]}`)
-      .join('&');
+    return sortedKeys.map(key => `${key}=${filteredParams[key]}`).join('&');
   }
 
   /**
    * 转换通知数据为统一格式
    */
-  protected async transformNotification(payload: PaymentNotifyPayload): Promise<UnifiedPaymentNotification> {
+  protected async transformNotification(
+    payload: PaymentNotifyPayload
+  ): Promise<UnifiedPaymentNotification> {
     const params = payload.raw as AlipayNotifyParams;
 
     // 转换为统一格式
@@ -243,7 +264,9 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   /**
    * 映射支付宝交易状态到统一状态
    */
-  private mapTradeStatus(tradeStatus: string): UnifiedPaymentNotification['tradeStatus'] {
+  private mapTradeStatus(
+    tradeStatus: string
+  ): UnifiedPaymentNotification['tradeStatus'] {
     switch (tradeStatus) {
       case 'TRADE_SUCCESS':
       case 'TRADE_FINISHED':
@@ -267,7 +290,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   /**
    * 生成失败响应
    */
-  generateFailureResponse(error?: string): string {
+  generateFailureResponse(_error?: string): string {
     return 'fail';
   }
 
@@ -282,8 +305,8 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
    * 后处理逻辑
    */
   protected async postProcess(
-    notification: UnifiedPaymentNotification, 
-    originalPayload: PaymentNotifyPayload
+    notification: UnifiedPaymentNotification,
+    _originalPayload: PaymentNotifyPayload
   ): Promise<void> {
     // 记录处理日志
     if (this.config.sandbox) {
@@ -303,14 +326,14 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
    */
   parseFormData(formData: any): AlipayNotifyParams {
     const params: any = {};
-    
+
     // 支持多种格式的表单数据
     if (typeof formData === 'object' && formData !== null) {
       // 如果是普通对象，直接使用
       if (formData.constructor === Object) {
         return formData as AlipayNotifyParams;
       }
-      
+
       // 如果有 entries 方法（类似 FormData）
       if (typeof formData.entries === 'function') {
         for (const [key, value] of formData.entries()) {
@@ -323,7 +346,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
         }
       }
     }
-    
+
     return params as AlipayNotifyParams;
   }
 
@@ -333,14 +356,14 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   parseUrlEncodedData(data: string): AlipayNotifyParams {
     const params: any = {};
     const pairs = data.split('&');
-    
+
     pairs.forEach(pair => {
       const [key, value] = pair.split('=');
       if (key && value) {
         params[decodeURIComponent(key)] = decodeURIComponent(value);
       }
     });
-    
+
     return params as AlipayNotifyParams;
   }
 
@@ -350,14 +373,19 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
    * @param error 错误信息
    * @returns 响应对象
    */
-  createResponse(success: boolean, error?: string): {
+  createResponse(
+    success: boolean,
+    error?: string
+  ): {
     status: number;
     body: string;
     headers: Record<string, string>;
   } {
     return {
-      status: success ? 200 : (error?.includes('验签') ? 401 : 400),
-      body: success ? this.generateSuccessResponse() : this.generateFailureResponse(),
+      status: success ? 200 : error?.includes('验签') ? 401 : 400,
+      body: success
+        ? this.generateSuccessResponse()
+        : this.generateFailureResponse(),
       headers: {
         'Content-Type': 'text/plain',
       },
@@ -377,4 +405,4 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   getSignType(): 'RSA' | 'RSA2' {
     return this.config.signType || 'RSA2';
   }
-} 
+}

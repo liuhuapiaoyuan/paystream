@@ -1,8 +1,8 @@
-import { 
-  UnifiedPaymentNotification, 
-  PaymentNotifyPayload, 
+import {
+  UnifiedPaymentNotification,
+  PaymentNotifyPayload,
   PaymentError,
-  PaymentErrorCode 
+  PaymentErrorCode,
 } from '../../types/payment';
 
 /**
@@ -33,7 +33,9 @@ export interface VerifyResult {
  * Provider 抽象基类
  * 所有支付提供商都必须实现这个抽象类
  */
-export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProviderConfig> {
+export abstract class BaseProvider<
+  TConfig extends BaseProviderConfig = BaseProviderConfig,
+> {
   protected config: TConfig;
   protected readonly providerName: string;
 
@@ -78,7 +80,9 @@ export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProv
    * @param payload 回调载荷
    * @returns 统一格式的支付通知
    */
-  async handleNotify(payload: PaymentNotifyPayload): Promise<UnifiedPaymentNotification> {
+  async handleNotify(
+    payload: PaymentNotifyPayload
+  ): Promise<UnifiedPaymentNotification> {
     if (!this.isEnabled()) {
       throw new PaymentError(
         PaymentErrorCode.CONFIG_ERROR,
@@ -110,7 +114,7 @@ export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProv
       if (error instanceof PaymentError) {
         throw error;
       }
-      
+
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_PROVIDER,
         `${this.providerName} 回调处理失败`,
@@ -136,14 +140,18 @@ export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProv
    * @param payload 回调载荷
    * @returns 验证结果
    */
-  protected abstract verifySignature(payload: PaymentNotifyPayload): Promise<VerifyResult>;
+  protected abstract verifySignature(
+    payload: PaymentNotifyPayload
+  ): Promise<VerifyResult>;
 
   /**
    * 转换通知数据为统一格式（抽象方法）
    * @param payload 回调载荷
    * @returns 统一格式的支付通知
    */
-  protected abstract transformNotification(payload: PaymentNotifyPayload): Promise<UnifiedPaymentNotification>;
+  protected abstract transformNotification(
+    payload: PaymentNotifyPayload
+  ): Promise<UnifiedPaymentNotification>;
 
   /**
    * 后处理逻辑（可选重写）
@@ -151,8 +159,8 @@ export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProv
    * @param originalPayload 原始载荷
    */
   protected async postProcess(
-    notification: UnifiedPaymentNotification, 
-    originalPayload: PaymentNotifyPayload
+    _notification: UnifiedPaymentNotification,
+    _originalPayload: PaymentNotifyPayload
   ): Promise<void> {
     // 默认实现为空，子类可以重写进行额外处理
   }
@@ -200,4 +208,4 @@ export abstract class BaseProvider<TConfig extends BaseProviderConfig = BaseProv
       supportedMethods: this.getSupportedMethods(),
     };
   }
-} 
+}

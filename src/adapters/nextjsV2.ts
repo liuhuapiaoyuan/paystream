@@ -1,15 +1,15 @@
 import { PaymentManagerV2 } from '../core/PaymentManagerV2';
-import { 
-  PaymentNotifyPayload, 
-  PaymentMethod, 
+import {
+  PaymentNotifyPayload,
+  PaymentMethod,
   UnifiedPaymentNotification,
   PaymentError,
-  PaymentErrorCode 
+  PaymentErrorCode,
 } from '../types/payment';
-import { 
-  BaseProvider, 
-  WechatProvider, 
-  AlipayProvider 
+import {
+  BaseProvider,
+  WechatProvider,
+  AlipayProvider,
 } from '../providers/base';
 
 /**
@@ -29,8 +29,16 @@ interface NextRequest extends Request {
  * 响应构建器接口
  */
 interface ResponseBuilder {
-  buildSuccessResponse(): { status: number; body: any; headers: Record<string, string> };
-  buildFailureResponse(error?: string): { status: number; body: any; headers: Record<string, string> };
+  buildSuccessResponse(): {
+    status: number;
+    body: any;
+    headers: Record<string, string>;
+  };
+  buildFailureResponse(error?: string): {
+    status: number;
+    body: any;
+    headers: Record<string, string>;
+  };
 }
 
 /**
@@ -42,11 +50,15 @@ export interface NotifyHandlerV2Config {
   /** 支付方式 */
   method: PaymentMethod;
   /** 成功回调 */
-  onSuccess?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
+  onSuccess?: (
+    notification: UnifiedPaymentNotification
+  ) => void | Promise<void>;
   /** 失败回调 */
   onFail?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
   /** 待处理回调 */
-  onPending?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
+  onPending?: (
+    notification: UnifiedPaymentNotification
+  ) => void | Promise<void>;
   /** 错误回调 */
   onError?: (error: PaymentError) => void | Promise<void>;
   /** 自定义响应构建器 */
@@ -79,7 +91,7 @@ class DefaultResponseBuilder implements ResponseBuilder {
     };
   }
 
-  private getHeaders(response: any): Record<string, string> {
+  private getHeaders(_response: any): Record<string, string> {
     if (this.provider instanceof WechatProvider) {
       return { 'Content-Type': 'application/json' };
     }
@@ -96,20 +108,20 @@ class DefaultResponseBuilder implements ResponseBuilder {
  * @returns 路由处理函数
  */
 export function createNotifyHandlerV2(config: NotifyHandlerV2Config) {
-  const { 
-    paymentManager, 
-    method, 
-    onSuccess, 
-    onFail, 
-    onPending, 
-    onError, 
+  const {
+    paymentManager,
+    method,
+    onSuccess,
+    onFail,
+    onPending,
+    onError,
     responseBuilder,
-    enableDebugLog = false 
+    enableDebugLog = false,
   } = config;
 
   return async function POST(request: NextRequest): Promise<NextResponse> {
     const startTime = Date.now();
-    
+
     try {
       if (enableDebugLog) {
         console.log(`🔄 [${method}] 开始处理支付回调...`);
@@ -117,14 +129,14 @@ export function createNotifyHandlerV2(config: NotifyHandlerV2Config) {
 
       // 解析支付载荷
       const payload = await parsePaymentPayload(request, method);
-      
+
       if (enableDebugLog) {
         console.log(`📦 [${method}] 载荷解析完成`);
       }
 
       // 使用 PaymentManagerV2 处理回调
       const result = await paymentManager.handleNotify(method, payload);
-      
+
       if (enableDebugLog) {
         console.log(`✅ [${method}] 回调处理完成:`, {
           outTradeNo: result.outTradeNo,
@@ -137,19 +149,25 @@ export function createNotifyHandlerV2(config: NotifyHandlerV2Config) {
       await executeStatusCallbacks(result, { onSuccess, onFail, onPending });
 
       // 构建响应
-      const response = await buildResponse(paymentManager, method, result, responseBuilder);
-      
+      const response = await buildResponse(
+        paymentManager,
+        method,
+        result,
+        responseBuilder
+      );
+
       return new Response(
-        typeof response.body === 'string' ? response.body : JSON.stringify(response.body),
+        typeof response.body === 'string'
+          ? response.body
+          : JSON.stringify(response.body),
         {
           status: response.status,
           headers: response.headers,
         }
       );
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       if (enableDebugLog) {
         console.error(`❌ [${method}] 回调处理失败 (${duration}ms):`, error);
       }
@@ -164,10 +182,17 @@ export function createNotifyHandlerV2(config: NotifyHandlerV2Config) {
       }
 
       // 构建错误响应
-      const errorResponse = await buildErrorResponse(paymentManager, method, error, responseBuilder);
-      
+      const errorResponse = await buildErrorResponse(
+        paymentManager,
+        method,
+        error,
+        responseBuilder
+      );
+
       return new Response(
-        typeof errorResponse.body === 'string' ? errorResponse.body : JSON.stringify(errorResponse.body),
+        typeof errorResponse.body === 'string'
+          ? errorResponse.body
+          : JSON.stringify(errorResponse.body),
         {
           status: errorResponse.status,
           headers: errorResponse.headers,
@@ -180,7 +205,10 @@ export function createNotifyHandlerV2(config: NotifyHandlerV2Config) {
 /**
  * 解析支付载荷
  */
-async function parsePaymentPayload(request: NextRequest, method: PaymentMethod): Promise<PaymentNotifyPayload> {
+async function parsePaymentPayload(
+  request: NextRequest,
+  method: PaymentMethod
+): Promise<PaymentNotifyPayload> {
   if (method.startsWith('wechat.')) {
     const raw = await request.json();
     const headers: Record<string, string> = {};
@@ -193,12 +221,12 @@ async function parsePaymentPayload(request: NextRequest, method: PaymentMethod):
       raw,
       headers,
     };
-  } 
-  
+  }
+
   if (method.startsWith('alipay.')) {
     const formData = await request.formData();
     const raw: Record<string, string> = {};
-    
+
     formData.forEach((value, key) => {
       raw[key] = value.toString();
     });
@@ -208,7 +236,7 @@ async function parsePaymentPayload(request: NextRequest, method: PaymentMethod):
       raw,
     };
   }
-  
+
   throw new PaymentError(
     PaymentErrorCode.INVALID_PARAMS,
     `不支持的支付方式: ${method}`
@@ -221,9 +249,13 @@ async function parsePaymentPayload(request: NextRequest, method: PaymentMethod):
 async function executeStatusCallbacks(
   result: UnifiedPaymentNotification,
   callbacks: {
-    onSuccess?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
+    onSuccess?: (
+      notification: UnifiedPaymentNotification
+    ) => void | Promise<void>;
     onFail?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
-    onPending?: (notification: UnifiedPaymentNotification) => void | Promise<void>;
+    onPending?: (
+      notification: UnifiedPaymentNotification
+    ) => void | Promise<void>;
   }
 ) {
   const { onSuccess, onFail, onPending } = callbacks;
@@ -266,7 +298,7 @@ async function buildResponse(
   }
 
   const builder = customBuilder || new DefaultResponseBuilder(provider);
-  
+
   if (result.tradeStatus === 'SUCCESS') {
     return builder.buildSuccessResponse();
   }
@@ -330,4 +362,4 @@ export function createAlipayNotifyHandlerV2(
     method,
     ...options,
   });
-} 
+}

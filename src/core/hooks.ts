@@ -1,4 +1,8 @@
-import { UnifiedPaymentNotification, HookHandler, HookEvent } from '../types/payment';
+import {
+  UnifiedPaymentNotification,
+  HookHandler,
+  HookEvent,
+} from '../types/payment';
 
 /**
  * Hook 管理器
@@ -36,9 +40,12 @@ export class HookManager {
    * @param event 事件名称
    * @param notification 支付通知
    */
-  async emit(event: HookEvent, notification: UnifiedPaymentNotification): Promise<void> {
+  async emit(
+    event: HookEvent,
+    notification: UnifiedPaymentNotification
+  ): Promise<void> {
     const handlers = this.hooks.get(event) || [];
-    
+
     // 并行执行所有处理函数
     const promises = handlers.map(handler => {
       try {
@@ -101,4 +108,4 @@ export async function callStatusHooks(
       await hookManager.emit('onPending', notification);
       break;
   }
-} 
+}

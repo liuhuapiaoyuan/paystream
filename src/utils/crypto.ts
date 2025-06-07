@@ -51,10 +51,10 @@ export function verifyWithRSA2(
     const verify = createVerify('RSA-SHA256');
     verify.write(data);
     verify.end();
-    
+
     // 确保公钥格式正确
     const formattedKey = formatPublicKey(publicKey);
-    
+
     return verify.verify(formattedKey, signature, 'base64');
   } catch (error) {
     throw new PaymentError(
@@ -81,9 +81,9 @@ export function verifyWithRSA(
     const verify = createVerify('RSA-SHA1');
     verify.write(data);
     verify.end();
-    
+
     const formattedKey = formatPublicKey(publicKey);
-    
+
     return verify.verify(formattedKey, signature, 'base64');
   } catch (error) {
     throw new PaymentError(
@@ -103,7 +103,7 @@ function formatPublicKey(publicKey: string): string {
   if (publicKey.includes('-----BEGIN PUBLIC KEY-----')) {
     return publicKey;
   }
-  
+
   return `-----BEGIN PUBLIC KEY-----\n${publicKey}\n-----END PUBLIC KEY-----`;
 }
 
@@ -123,9 +123,9 @@ export function signWithRSA(
     const sign = createSign(algorithm);
     sign.write(data);
     sign.end();
-    
+
     const formattedKey = formatPrivateKey(privateKey);
-    
+
     return sign.sign(formattedKey, 'base64');
   } catch (error) {
     throw new PaymentError(
@@ -145,7 +145,7 @@ function formatPrivateKey(privateKey: string): string {
   if (privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
     return privateKey;
   }
-  
+
   return `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
 }
 
@@ -167,13 +167,13 @@ export function verifyWechatSignature(
 ): boolean {
   try {
     const message = `${timestamp}\n${nonce}\n${body}\n`;
-    
+
     const verify = createVerify('RSA-SHA256');
     verify.write(message);
     verify.end();
-    
+
     const formattedKey = formatPublicKey(publicKey);
-    
+
     return verify.verify(formattedKey, signature, 'base64');
   } catch (error) {
     throw new PaymentError(
@@ -190,7 +190,8 @@ export function verifyWechatSignature(
  * @returns 随机字符串
  */
 export function generateNonce(length: number = 32): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -226,8 +227,8 @@ export function base64UrlEncode(str: string): string {
  */
 export function base64UrlDecode(str: string): string {
   // 补齐 padding
-  str += '='.repeat((4 - str.length % 4) % 4);
+  str += '='.repeat((4 - (str.length % 4)) % 4);
   // 替换字符
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   return Buffer.from(str, 'base64').toString();
-} 
+}

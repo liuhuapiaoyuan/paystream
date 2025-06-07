@@ -1,13 +1,10 @@
 // 导出基础抽象类和接口
 export { BaseProvider } from './BaseProvider';
 export type { BaseProviderConfig, VerifyResult } from './BaseProvider';
-export { 
-  ProviderFactory,
-  defaultProviderFactory 
-} from './ProviderFactory';
-export type { 
-  ProviderConstructor, 
-  ProviderRegistration
+export { ProviderFactory, defaultProviderFactory } from './ProviderFactory';
+export type {
+  ProviderConstructor,
+  ProviderRegistration,
 } from './ProviderFactory';
 
 // 导出具体的 Provider 实现
@@ -69,7 +66,7 @@ export function getRegisteredProviderInfo(): Array<{
   }> = [];
 
   const registrations = defaultProviderFactory.getAllRegistrations();
-  
+
   for (const [name, registration] of registrations) {
     // 创建临时实例获取支持的方法
     try {
@@ -77,18 +74,22 @@ export function getRegisteredProviderInfo(): Array<{
         enabled: false,
         ...registration.defaultConfig,
         // 提供最小必要配置以通过验证
-        ...(name === 'wechat' ? {
-          appId: 'wx0000000000000000',
-          mchId: '0000000000',
-          apiV3Key: '00000000000000000000000000000000',
-          privateKey: 'temp-key',
-          serialNo: 'temp-serial',
-        } : {}),
-        ...(name === 'alipay' ? {
-          appId: '0000000000000000',
-          privateKey: 'temp-key',
-          alipayPublicKey: 'temp-key',
-        } : {}),
+        ...(name === 'wechat'
+          ? {
+              appId: 'wx0000000000000000',
+              mchId: '0000000000',
+              apiV3Key: '00000000000000000000000000000000',
+              privateKey: 'temp-key',
+              serialNo: 'temp-serial',
+            }
+          : {}),
+        ...(name === 'alipay'
+          ? {
+              appId: '0000000000000000',
+              privateKey: 'temp-key',
+              alipayPublicKey: 'temp-key',
+            }
+          : {}),
       } as any);
 
       providers.push({
@@ -112,4 +113,4 @@ export function getRegisteredProviderInfo(): Array<{
 }
 
 // 自动注册内置 Provider
-registerBuiltInProviders(); 
+registerBuiltInProviders();

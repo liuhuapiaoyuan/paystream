@@ -1,17 +1,17 @@
-import { 
-  UnifiedPaymentNotification, 
-  PaymentNotifyPayload, 
-  PaymentError, 
+import {
+  UnifiedPaymentNotification,
+  PaymentNotifyPayload,
+  PaymentError,
   PaymentErrorCode,
-  PaymentMethod
+  PaymentMethod,
 } from '../types/payment';
 import { PaymentConfig } from '../types/config';
 import { HookManager, callStatusHooks } from './hooks';
-import { 
-  BaseProvider, 
-  defaultProviderFactory, 
-  WechatProviderConfig, 
-  AlipayProviderConfig 
+import {
+  BaseProvider,
+  defaultProviderFactory,
+  WechatProviderConfig,
+  AlipayProviderConfig,
 } from '../providers/base';
 
 /**
@@ -74,9 +74,9 @@ export class PaymentManagerV2 {
           serialNo: this.config.wechat.serialNo,
           platformCertificate: this.config.wechat.platformCertificate,
         } as WechatProviderConfig);
-        
+
         this.providers.set('wechat', wechatProvider);
-        
+
         if (this.config.global?.enableLog) {
           console.log('✅ 微信支付 Provider 初始化成功');
         }
@@ -99,9 +99,9 @@ export class PaymentManagerV2 {
           gateway: this.config.alipay.gateway,
           returnUrl: this.config.alipay.returnUrl,
         } as AlipayProviderConfig);
-        
+
         this.providers.set('alipay', alipayProvider);
-        
+
         if (this.config.global?.enableLog) {
           console.log('✅ 支付宝 Provider 初始化成功');
         }
@@ -137,10 +137,10 @@ export class PaymentManagerV2 {
     try {
       // 解析 Provider 名称
       const providerName = this.parseProviderName(method);
-      
+
       // 获取 Provider 实例
       const provider = this.getProvider(providerName);
-      
+
       // 验证支付方式是否支持
       if (!provider.isSupportedMethod(method)) {
         throw new PaymentError(
@@ -175,7 +175,7 @@ export class PaymentManagerV2 {
       if (error instanceof PaymentError) {
         throw error;
       }
-      
+
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_PROVIDER,
         '支付回调处理失败',
@@ -197,7 +197,7 @@ export class PaymentManagerV2 {
    */
   private getProvider(providerName: string): BaseProvider {
     const provider = this.providers.get(providerName);
-    
+
     if (!provider) {
       throw new PaymentError(
         PaymentErrorCode.UNKNOWN_PROVIDER,
@@ -222,7 +222,7 @@ export class PaymentManagerV2 {
    */
   addProvider(name: string, provider: BaseProvider): void {
     this.providers.set(name, provider);
-    
+
     if (this.config.global?.enableLog) {
       console.log(`➕ 添加 Provider: ${name}`);
     }
@@ -234,7 +234,7 @@ export class PaymentManagerV2 {
    */
   removeProvider(name: string): void {
     this.providers.delete(name);
-    
+
     if (this.config.global?.enableLog) {
       console.log(`➖ 移除 Provider: ${name}`);
     }
@@ -252,19 +252,27 @@ export class PaymentManagerV2 {
   /**
    * 注册 Hook
    */
-  onNotify(handler: (notification: UnifiedPaymentNotification) => void | Promise<void>): void {
+  onNotify(
+    handler: (notification: UnifiedPaymentNotification) => void | Promise<void>
+  ): void {
     this.hookManager.on('onNotify', handler);
   }
 
-  onSuccess(handler: (notification: UnifiedPaymentNotification) => void | Promise<void>): void {
+  onSuccess(
+    handler: (notification: UnifiedPaymentNotification) => void | Promise<void>
+  ): void {
     this.hookManager.on('onSuccess', handler);
   }
 
-  onFail(handler: (notification: UnifiedPaymentNotification) => void | Promise<void>): void {
+  onFail(
+    handler: (notification: UnifiedPaymentNotification) => void | Promise<void>
+  ): void {
     this.hookManager.on('onFail', handler);
   }
 
-  onPending(handler: (notification: UnifiedPaymentNotification) => void | Promise<void>): void {
+  onPending(
+    handler: (notification: UnifiedPaymentNotification) => void | Promise<void>
+  ): void {
     this.hookManager.on('onPending', handler);
   }
 
@@ -281,15 +289,15 @@ export class PaymentManagerV2 {
    */
   updateConfig(newConfig: Partial<PaymentConfig>): void {
     this.config = this.mergeConfig(newConfig);
-    
+
     // 清空并重新初始化 Provider
     this.providers.clear();
     this.initializeProviders();
-    
+
     // 重新初始化 Hook
     this.hookManager.clear();
     this.initializeHooks();
-    
+
     if (this.config.global?.enableLog) {
       console.log('🔄 配置已更新并重新初始化 Provider');
     }
@@ -308,13 +316,13 @@ export class PaymentManagerV2 {
    */
   getEnabledProviders(): string[] {
     const enabledProviders: string[] = [];
-    
+
     for (const [name, provider] of this.providers) {
       if (provider.isEnabled()) {
         enabledProviders.push(name);
       }
     }
-    
+
     return enabledProviders;
   }
 
@@ -349,13 +357,13 @@ export class PaymentManagerV2 {
    */
   getSupportedMethods(): string[] {
     const methods: string[] = [];
-    
+
     for (const provider of this.providers.values()) {
       if (provider.isEnabled()) {
         methods.push(...provider.getSupportedMethods());
       }
     }
-    
+
     return methods;
   }
 
@@ -366,7 +374,7 @@ export class PaymentManagerV2 {
     try {
       const providerName = this.parseProviderName(method);
       const provider = this.providers.get(providerName);
-      
+
       return provider ? provider.isSupportedMethod(method) : false;
     } catch {
       return false;
@@ -386,7 +394,7 @@ export class PaymentManagerV2 {
   destroy(): void {
     this.providers.clear();
     this.hookManager.clear();
-    
+
     if (this.config.global?.enableLog) {
       console.log('🗑️ PaymentManager 已销毁');
     }
@@ -396,6 +404,8 @@ export class PaymentManagerV2 {
 /**
  * 创建支付管理器实例
  */
-export function createPaymentManagerV2(config?: Partial<PaymentConfig>): PaymentManagerV2 {
+export function createPaymentManagerV2(
+  config?: Partial<PaymentConfig>
+): PaymentManagerV2 {
   return new PaymentManagerV2(config);
-} 
+}

@@ -1,25 +1,28 @@
 // 核心面向对象架构 - PayStream V2
-export { PaymentManagerV2, createPaymentManagerV2 } from './core/PaymentManagerV2';
+export {
+  PaymentManagerV2,
+  createPaymentManagerV2,
+} from './core/PaymentManagerV2';
 export { HookManager, callStatusHooks } from './core/hooks';
 
 // Provider 架构
-export { 
-  BaseProvider, 
-  ProviderFactory, 
+export {
+  BaseProvider,
+  ProviderFactory,
   defaultProviderFactory,
   WechatProvider,
   AlipayProvider,
   registerBuiltInProviders,
-  getRegisteredProviderInfo
+  getRegisteredProviderInfo,
 } from './providers/base';
 
-export type { 
-  BaseProviderConfig, 
+export type {
+  BaseProviderConfig,
   VerifyResult,
   ProviderConstructor,
   ProviderRegistration,
   WechatProviderConfig,
-  AlipayProviderConfig
+  AlipayProviderConfig,
 } from './providers/base';
 
 // 类型定义
@@ -36,10 +39,7 @@ export type {
   AlipayMethod,
 } from './types/payment';
 
-export {
-  PaymentError,
-  PaymentErrorCode,
-} from './types/payment';
+export { PaymentError, PaymentErrorCode } from './types/payment';
 
 export type {
   PaymentConfig,
@@ -64,9 +64,7 @@ export {
   createAlipayNotifyHandlerV2,
 } from './adapters/nextjsV2';
 
-export type {
-  NotifyHandlerV2Config,
-} from './adapters/nextjsV2';
+export type { NotifyHandlerV2Config } from './adapters/nextjsV2';
 
 // 加密工具
 export {
@@ -82,4 +80,4 @@ export {
 } from './utils/crypto';
 
 // 版本信息
-export const version = '2.0.0'; 
+export const version = '2.0.0';

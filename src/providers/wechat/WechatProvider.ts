@@ -1,12 +1,15 @@
-import { BaseProvider, BaseProviderConfig, VerifyResult } from '../base/BaseProvider';
-import { 
-  UnifiedPaymentNotification, 
-  PaymentNotifyPayload, 
-  PaymentError, 
+import {
+  BaseProvider,
+  BaseProviderConfig,
+  VerifyResult,
+} from '../base/BaseProvider';
+import {
+  UnifiedPaymentNotification,
+  PaymentNotifyPayload,
+  PaymentError,
   PaymentErrorCode,
-  WechatPayMethod 
+  WechatPayMethod,
 } from '../../types/payment';
-import { WechatPayConfig } from '../../types/config';
 import { aesGcmDecrypt, verifyWechatSignature } from '../../utils/crypto';
 
 /**
@@ -71,7 +74,12 @@ export interface WechatProviderConfig extends BaseProviderConfig {
  * 微信支付 Provider 实现
  */
 export class WechatProvider extends BaseProvider<WechatProviderConfig> {
-  private readonly supportedMethods: WechatPayMethod[] = ['native', 'jsapi', 'h5', 'app'];
+  private readonly supportedMethods: WechatPayMethod[] = [
+    'native',
+    'jsapi',
+    'h5',
+    'app',
+  ];
 
   constructor(config: WechatProviderConfig) {
     super(config, 'wechat');
@@ -82,7 +90,7 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
    */
   protected validateConfig(): void {
     const required = ['appId', 'mchId', 'apiV3Key', 'privateKey', 'serialNo'];
-    
+
     for (const key of required) {
       if (!this.config[key as keyof WechatProviderConfig]) {
         throw new PaymentError(
@@ -121,19 +129,21 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
     }
 
     const notification = payload.raw as WechatNotification;
-    
-    if (!notification.resource) {
+
+    // 检查必要字段
+    if (!notification.id || !notification.resource) {
       throw new PaymentError(
         PaymentErrorCode.INVALID_PARAMS,
-        '微信支付回调缺少 resource 字段'
+        '微信支付回调数据格式错误'
       );
     }
 
+    // 检查加密数据
     const { ciphertext, nonce, associated_data } = notification.resource;
     if (!ciphertext || !nonce || !associated_data) {
       throw new PaymentError(
         PaymentErrorCode.INVALID_PARAMS,
-        '微信支付回调 resource 字段不完整'
+        '微信支付回调缺少加密数据'
       );
     }
   }
@@ -141,41 +151,42 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
   /**
    * 验证签名
    */
-  protected async verifySignature(payload: PaymentNotifyPayload): Promise<VerifyResult> {
-    // 如果没有平台证书，跳过验签
-    if (!this.config.platformCertificate) {
-      return { success: true, details: ' 跳过验签（无平台证书）' };
-    }
-
-    const { headers, raw } = payload;
-    
-    if (!headers) {
-      return { 
-        success: false, 
-        error: '缺少请求头信息' 
-      };
-    }
-
-    const timestamp = headers['wechatpay-timestamp'];
-    const nonce = headers['wechatpay-nonce'];
-    const signature = headers['wechatpay-signature'];
-    const serialNo = headers['wechatpay-serial'];
-
-    if (!timestamp || !nonce || !signature || !serialNo) {
-      return { 
-        success: false, 
-        error: '缺少必要的签名参数' 
-      };
-    }
-
+  protected async verifySignature(
+    payload: PaymentNotifyPayload
+  ): Promise<VerifyResult> {
     try {
+      const { headers, raw } = payload;
+
+      if (!headers) {
+        return {
+          success: false,
+          error: '缺少请求头信息',
+        };
+      }
+
+      // 获取签名相关头部
+      const timestamp = headers['wechatpay-timestamp'];
+      const nonce = headers['wechatpay-nonce'];
+      const signature = headers['wechatpay-signature'];
+      const serial = headers['wechatpay-serial'];
+
+      if (!timestamp || !nonce || !signature || !serial) {
+        return {
+          success: false,
+          error: '缺少必要的签名头部信息',
+        };
+      }
+
+      // 构建待验签字符串
       const body = typeof raw === 'string' ? raw : JSON.stringify(raw);
+
+      // 验证签名
       const isValid = verifyWechatSignature(
         timestamp,
         nonce,
         body,
         signature,
-        this.config.platformCertificate
+        this.config.platformCertificate || ''
       );
 
       return {
@@ -184,8 +195,8 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
         details: {
           timestamp,
           nonce,
-          serialNo,
-        }
+          serial,
+        },
       };
     } catch (error) {
       return {
@@ -198,58 +209,53 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
   /**
    * 转换通知数据为统一格式
    */
-  protected async transformNotification(payload: PaymentNotifyPayload): Promise<UnifiedPaymentNotification> {
+  protected async transformNotification(
+    payload: PaymentNotifyPayload
+  ): Promise<UnifiedPaymentNotification> {
     const notification = payload.raw as WechatNotification;
-    const { resource } = notification;
 
-    try {
-      // 解密回调数据
-      const decryptedStr = aesGcmDecrypt(
-        resource.ciphertext,
-        resource.nonce,
-        resource.associated_data,
-        this.config.apiV3Key
-      );
+    // 解密数据
+    const decryptedData = aesGcmDecrypt(
+      notification.resource.ciphertext,
+      this.config.apiV3Key,
+      notification.resource.nonce,
+      notification.resource.associated_data
+    );
 
-      const transactionData: WechatTransactionData = JSON.parse(decryptedStr);
+    const transactionData: WechatTransactionData = JSON.parse(decryptedData);
 
-      // 转换为统一格式
-      const result: UnifiedPaymentNotification = {
-        provider: 'wechat',
-        tradeStatus: this.mapTradeStatus(transactionData.trade_state),
-        outTradeNo: transactionData.out_trade_no,
-        tradeNo: transactionData.transaction_id,
-        totalAmount: transactionData.amount.total,
-        payerId: transactionData.payer.openid,
-        raw: transactionData,
-        timestamp: Date.now(),
-      };
+    // 转换为统一格式
+    const result: UnifiedPaymentNotification = {
+      provider: 'wechat',
+      tradeStatus: this.mapTradeStatus(transactionData.trade_state),
+      outTradeNo: transactionData.out_trade_no,
+      tradeNo: transactionData.transaction_id,
+      totalAmount: transactionData.amount.total,
+      payerId: transactionData.payer.openid,
+      raw: transactionData,
+      timestamp: Date.now(),
+    };
 
-      return result;
-    } catch (error) {
-      throw new PaymentError(
-        PaymentErrorCode.DECRYPT_FAILED,
-        '微信支付回调数据解密失败',
-        error
-      );
-    }
+    return result;
   }
 
   /**
    * 映射微信支付交易状态到统一状态
    */
-  private mapTradeStatus(tradeState: string): UnifiedPaymentNotification['tradeStatus'] {
+  private mapTradeStatus(
+    tradeState: string
+  ): UnifiedPaymentNotification['tradeStatus'] {
     switch (tradeState) {
       case 'SUCCESS':
         return 'SUCCESS';
       case 'REFUND':
-        return 'FAIL';
-      case 'NOTPAY':
-      case 'USERPAYING':
-        return 'PENDING';
+      case 'CLOSED':
       case 'REVOKED':
       case 'PAYERROR':
         return 'FAIL';
+      case 'USERPAYING':
+      case 'NOTPAY':
+        return 'PENDING';
       default:
         return 'PENDING';
     }
@@ -261,17 +267,17 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
   generateSuccessResponse(): object {
     return {
       code: 'SUCCESS',
-      message: 'OK'
+      message: '成功',
     };
   }
 
   /**
    * 生成失败响应
    */
-  generateFailureResponse(error?: string): object {
+  generateFailureResponse(_error?: string): object {
     return {
       code: 'FAIL',
-      message: error || '处理失败'
+      message: '失败',
     };
   }
 
@@ -286,8 +292,8 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
    * 后处理逻辑
    */
   protected async postProcess(
-    notification: UnifiedPaymentNotification, 
-    originalPayload: PaymentNotifyPayload
+    notification: UnifiedPaymentNotification,
+    _originalPayload: PaymentNotifyPayload
   ): Promise<void> {
     // 记录处理日志
     if (this.config.sandbox) {
@@ -304,21 +310,23 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
 
   /**
    * 创建响应对象
-   * @param success 是否成功
-   * @param error 错误信息
-   * @returns 响应对象
    */
-  createResponse(success: boolean, error?: string): {
+  createResponse(
+    success: boolean,
+    _error?: string
+  ): {
     status: number;
     body: object;
     headers: Record<string, string>;
   } {
     return {
-      status: success ? 200 : (error?.includes('验签') ? 401 : 400),
-      body: success ? this.generateSuccessResponse() : this.generateFailureResponse(error),
+      status: success ? 200 : 400,
+      body: success
+        ? this.generateSuccessResponse()
+        : this.generateFailureResponse(),
       headers: {
         'Content-Type': 'application/json',
       },
     };
   }
-} 
+}

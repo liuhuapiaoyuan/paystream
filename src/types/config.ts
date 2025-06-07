@@ -75,7 +75,7 @@ export interface EnvConfig {
   WECHAT_SERIAL_NO?: string;
   WECHAT_PLATFORM_CERT?: string;
   WECHAT_NOTIFY_URL?: string;
-  
+
   // 支付宝
   ALIPAY_APP_ID?: string;
   ALIPAY_PRIVATE_KEY?: string;
@@ -84,10 +84,10 @@ export interface EnvConfig {
   ALIPAY_GATEWAY?: string;
   ALIPAY_NOTIFY_URL?: string;
   ALIPAY_RETURN_URL?: string;
-  
+
   // 全局配置
   PAYMENT_TIMEOUT?: string;
   PAYMENT_RETRIES?: string;
   PAYMENT_LOG_LEVEL?: string;
   PAYMENT_ENABLE_LOG?: string;
-} 
+}
