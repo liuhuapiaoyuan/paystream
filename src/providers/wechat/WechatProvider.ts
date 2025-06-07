@@ -24,6 +24,10 @@ import {
   WechatNativeOrderParams,
   WechatJSAPIOrderParams,
   WechatH5OrderParams,
+  WechatNativeOrderResponse,
+  WechatJSAPIOrderResponse,
+  WechatH5OrderResponse,
+  WechatOrderQueryResponse,
 } from '../../utils/wechat';
 
 /**
@@ -396,27 +400,30 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
         throw new Error('notify_url 是必需的');
       }
 
-      let result: any;
-      const paymentData: any = {};
+      let result:
+        | WechatNativeOrderResponse
+        | WechatJSAPIOrderResponse
+        | WechatH5OrderResponse;
+      const paymentData: Record<string, unknown> = {};
 
       switch (wechatMethod) {
         case 'native':
           result = await this.createNativePayment(request);
-          paymentData.qrCode = result.code_url;
+          paymentData.qrCode = (result as WechatNativeOrderResponse).code_url;
           break;
 
         case 'jsapi':
           result = await this.createJSAPIPayment(request);
           paymentData.payParams = generateJSAPIPayParams(
             this.config.appId,
-            result.prepay_id,
+            (result as WechatJSAPIOrderResponse).prepay_id,
             this.config.privateKey
           );
           break;
 
         case 'h5':
           result = await this.createH5Payment(request);
-          paymentData.payUrl = result.h5_url;
+          paymentData.payUrl = (result as WechatH5OrderResponse).h5_url;
           break;
 
         default:
@@ -425,7 +432,10 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
 
       return {
         success: true,
-        tradeNo: result.prepay_id || result.code_url || result.h5_url,
+        tradeNo:
+          (result as WechatJSAPIOrderResponse).prepay_id ||
+          (result as WechatNativeOrderResponse).code_url ||
+          (result as WechatH5OrderResponse).h5_url,
         paymentData,
         raw: result,
       };
@@ -493,13 +503,20 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
   /**
    * 构建基础订单参数
    */
-  private buildBaseOrderParams(request: CreateOrderRequest) {
+  private buildBaseOrderParams(
+    request: CreateOrderRequest
+  ): Omit<WechatNativeOrderParams, 'scene_info'> {
+    // 确保 notifyUrl 存在（在调用这个方法之前已经检查过）
+    if (!request.notifyUrl) {
+      throw new Error('notify_url is required');
+    }
+
     return {
       appid: this.config.appId,
       mchid: this.config.mchId,
       description: request.subject,
       out_trade_no: request.outTradeNo,
-      notify_url: request.notifyUrl!,
+      notify_url: request.notifyUrl,
       amount: {
         total: request.totalAmount, // 单位为分
         currency: 'CNY',
@@ -519,7 +536,7 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
    */
   async queryOrder(request: QueryOrderRequest): Promise<QueryOrderResponse> {
     try {
-      let result: any;
+      let result: WechatOrderQueryResponse;
 
       if (request.tradeNo) {
         // 通过微信支付订单号查询
