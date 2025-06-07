@@ -3,6 +3,12 @@ import {
   PaymentNotifyPayload,
   PaymentError,
   PaymentErrorCode,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  RefundRequest,
+  RefundResponse,
 } from '../../types/payment';
 
 /**
@@ -191,6 +197,31 @@ export abstract class BaseProvider<
   isSupportedMethod(method: string): boolean {
     return this.getSupportedMethods().includes(method);
   }
+
+  /**
+   * 创建支付订单（抽象方法）
+   * @param method 支付方式
+   * @param request 订单创建请求
+   * @returns 订单创建响应
+   */
+  abstract createOrder(
+    method: string,
+    request: CreateOrderRequest
+  ): Promise<CreateOrderResponse>;
+
+  /**
+   * 查询支付订单（抽象方法）
+   * @param request 订单查询请求
+   * @returns 订单查询响应
+   */
+  abstract queryOrder(request: QueryOrderRequest): Promise<QueryOrderResponse>;
+
+  /**
+   * 发起退款（抽象方法）
+   * @param request 退款请求
+   * @returns 退款响应
+   */
+  abstract refund(request: RefundRequest): Promise<RefundResponse>;
 
   /**
    * 获取 Provider 状态信息

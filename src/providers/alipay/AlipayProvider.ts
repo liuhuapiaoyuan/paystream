@@ -9,8 +9,22 @@ import {
   PaymentError,
   PaymentErrorCode,
   AlipayMethod,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  RefundRequest,
+  RefundResponse,
 } from '../../types/payment';
 import { verifyWithRSA2, verifyWithRSA } from '../../utils/crypto';
+import {
+  AlipayClient,
+  AlipayTradeCreateParams,
+  AlipayTradeWapPayParams,
+  AlipayTradePagePayParams,
+  AlipayTradeQueryParams,
+  AlipayTradeRefundParams,
+} from '../../utils/alipay';
 
 /**
  * 支付宝回调参数
@@ -94,8 +108,17 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
     'app',
   ];
 
+  private alipayClient: AlipayClient;
+
   constructor(config: AlipayProviderConfig) {
     super(config, 'alipay');
+    this.alipayClient = new AlipayClient(
+      config.appId,
+      config.privateKey,
+      config.alipayPublicKey,
+      config.signType || 'RSA2',
+      config.sandbox
+    );
   }
 
   /**
@@ -290,8 +313,8 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   /**
    * 生成失败响应
    */
-  generateFailureResponse(_error?: string): string {
-    return 'fail';
+  generateFailureResponse(error?: string): string {
+    return error || 'failure';
   }
 
   /**
@@ -404,5 +427,194 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
    */
   getSignType(): 'RSA' | 'RSA2' {
     return this.config.signType || 'RSA2';
+  }
+
+  /**
+   * 创建支付订单
+   */
+  async createOrder(
+    method: string,
+    request: CreateOrderRequest
+  ): Promise<CreateOrderResponse> {
+    try {
+      const alipayMethod = method.replace('alipay.', '') as AlipayMethod;
+
+      if (!this.supportedMethods.includes(alipayMethod)) {
+        throw new Error(`不支持的支付方式: ${method}`);
+      }
+
+      let result: any;
+      const paymentData: any = {};
+
+      switch (alipayMethod) {
+        case 'qrcode': {
+          const params: AlipayTradeCreateParams = {
+            out_trade_no: request.outTradeNo,
+            total_amount: (request.totalAmount / 100).toString(), // 转换为元
+            subject: request.subject,
+            body: request.body,
+            product_code: 'FACE_TO_FACE_PAYMENT',
+            timeout_express: request.timeExpire
+              ? `${request.timeExpire}m`
+              : '30m',
+          };
+
+          result = await this.alipayClient.tradeCreate(params);
+          paymentData.qrCode = `https://qr.alipay.com/${result.qr_code}`;
+          break;
+        }
+
+        case 'h5': {
+          const params: AlipayTradeWapPayParams = {
+            out_trade_no: request.outTradeNo,
+            total_amount: (request.totalAmount / 100).toString(),
+            subject: request.subject,
+            body: request.body,
+            product_code: 'QUICK_WAP_WAY',
+            time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
+            quit_url: request.returnUrl || 'https://example.com',
+          };
+
+          const formHtml = await this.alipayClient.tradeWapPay(params);
+          paymentData.payUrl = formHtml; // 这里应该是提取的URL
+          break;
+        }
+
+        case 'pc': {
+          const params: AlipayTradePagePayParams = {
+            out_trade_no: request.outTradeNo,
+            total_amount: (request.totalAmount / 100).toString(),
+            subject: request.subject,
+            body: request.body,
+            product_code: 'FAST_INSTANT_TRADE_PAY',
+            time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
+            return_url: request.returnUrl,
+            notify_url: request.notifyUrl,
+          };
+
+          const formHtml = await this.alipayClient.tradePagePay(params);
+          paymentData.payForm = formHtml;
+          break;
+        }
+
+        case 'app': {
+          // APP支付暂时使用二维码支付的逻辑
+          const params: AlipayTradeCreateParams = {
+            out_trade_no: request.outTradeNo,
+            total_amount: (request.totalAmount / 100).toString(),
+            subject: request.subject,
+            body: request.body,
+            product_code: 'QUICK_MSECURITY_PAY',
+            timeout_express: request.timeExpire
+              ? `${request.timeExpire}m`
+              : '30m',
+          };
+
+          result = await this.alipayClient.tradeCreate(params);
+          paymentData.orderInfo = result; // APP支付返回订单信息
+          break;
+        }
+
+        default:
+          throw new Error(`不支持的支付宝支付方式: ${alipayMethod}`);
+      }
+
+      return {
+        success: true,
+        tradeNo: result?.trade_no || `alipay_${Date.now()}`,
+        paymentData,
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '创建订单失败',
+      };
+    }
+  }
+
+  /**
+   * 查询支付订单
+   */
+  async queryOrder(request: QueryOrderRequest): Promise<QueryOrderResponse> {
+    try {
+      const params: AlipayTradeQueryParams = {};
+
+      if (request.tradeNo) {
+        params.trade_no = request.tradeNo;
+      } else if (request.outTradeNo) {
+        params.out_trade_no = request.outTradeNo;
+      } else {
+        throw new Error('必须提供 tradeNo 或 outTradeNo');
+      }
+
+      const result = await this.alipayClient.tradeQuery(params);
+
+      // 映射交易状态
+      const tradeStatus = this.mapTradeStatus(result.trade_status);
+
+      return {
+        success: true,
+        orderInfo: {
+          tradeStatus,
+          outTradeNo: result.out_trade_no,
+          tradeNo: result.trade_no,
+          totalAmount: Math.round(parseFloat(result.total_amount) * 100), // 转换为分
+          receiptAmount: result.receipt_amount
+            ? Math.round(parseFloat(result.receipt_amount) * 100)
+            : undefined,
+          payerId: result.buyer_user_id,
+          createTime: new Date().toISOString(), // 支付宝不返回创建时间
+          payTime: result.send_pay_date || new Date().toISOString(),
+        },
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '查询订单失败',
+      };
+    }
+  }
+
+  /**
+   * 发起退款
+   */
+  async refund(request: RefundRequest): Promise<RefundResponse> {
+    try {
+      const params: AlipayTradeRefundParams = {
+        refund_amount: (request.refundAmount / 100).toString(), // 转换为元
+        refund_reason: request.refundReason || '商户退款',
+        out_request_no: request.outRefundNo,
+      };
+
+      // 根据提供的参数选择查询方式
+      if (request.tradeNo) {
+        params.trade_no = request.tradeNo;
+      } else if (request.outTradeNo) {
+        params.out_trade_no = request.outTradeNo;
+      } else {
+        throw new Error('必须提供 tradeNo 或 outTradeNo');
+      }
+
+      const result = await this.alipayClient.tradeRefund(params);
+
+      return {
+        success: true,
+        refundInfo: {
+          refundId: `${result.trade_no}_${request.outRefundNo}`,
+          outRefundNo: request.outRefundNo,
+          refundAmount: Math.round(parseFloat(result.refund_fee) * 100), // 转换为分
+          refundStatus: result.fund_change === 'Y' ? 'SUCCESS' : 'FAIL',
+          refundTime: result.gmt_refund_pay || new Date().toISOString(),
+        },
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '退款失败',
+      };
+    }
   }
 }

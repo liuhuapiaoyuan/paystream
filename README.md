@@ -1,17 +1,19 @@
 # PayStream V2 🚀
 
-> 现代化的 TypeScript 统一支付回调处理库 - 采用面向对象架构
+> 现代化的 TypeScript 统一支付解决方案 - 采用面向对象架构
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-13%2B-black.svg)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-PayStream V2 是一个强大的 TypeScript 库，采用现代面向对象架构，统一处理微信支付和支付宝的回调通知。通过 Provider 模式和工厂设计模式，提供了清晰、可扩展、类型安全的支付回调处理解决方案。
+PayStream V2 是一个强大的 TypeScript 支付库，采用现代面向对象架构，统一处理微信支付和支付宝的订单创建、支付查询、退款操作和回调通知。通过 Provider 模式和工厂设计模式，提供了清晰、可扩展、类型安全的完整支付解决方案。
 
 ## ✨ 核心特性
 
 - 🏗️ **面向对象架构** - 基于 Provider 抽象的清晰设计
+- 💳 **统一支付接口** - 支持微信支付和支付宝的订单创建、查询、退款
 - 🔒 **类型安全** - 完整的 TypeScript 类型支持
+- 📱 **多种支付方式** - Native扫码、JSAPI、H5、APP等支付方式
 - 🎯 **精简设计** - 专注核心功能，移除冗余代码
 - 📊 **详细日志** - 可配置的调试和性能监控
 - 🔧 **自定义响应** - 灵活的响应构建器接口
@@ -68,7 +70,199 @@ const config: PaymentConfig = {
 const paymentManager = createPaymentManagerV2(config);
 ```
 
-### 设置事件监听器
+## 💳 支付订单创建
+
+### 微信支付 Native 扫码支付
+
+```typescript
+import { CreateOrderRequest } from 'paystream';
+
+// 创建 Native 扫码支付订单
+const createNativeOrder = async () => {
+  const orderRequest: CreateOrderRequest = {
+    outTradeNo: `ORDER_${Date.now()}`,
+    totalAmount: 100, // 1元，单位：分
+    subject: '测试商品',
+    body: '这是一个测试商品的描述',
+    timeExpire: 30, // 30分钟过期
+    clientIp: '192.168.1.100',
+  };
+
+  try {
+    const result = await paymentManager.createOrder('wechat.native', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 微信Native支付订单创建成功');
+      console.log('二维码链接:', result.paymentData?.qrCode);
+      
+      // 将二维码链接生成二维码图片展示给用户扫描
+      // 可以使用 qrcode 库：npm install qrcode
+      // const QRCode = require('qrcode');
+      // const qrCodeImage = await QRCode.toDataURL(result.paymentData.qrCode);
+      
+      return result.paymentData?.qrCode;
+    } else {
+      console.error('❌ 创建订单失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 创建订单异常:', error);
+  }
+};
+```
+
+### 微信支付 JSAPI 支付（小程序/公众号）
+
+```typescript
+import { WechatCreateOrderRequest } from 'paystream';
+
+// 创建 JSAPI 支付订单
+const createJSAPIOrder = async (openid: string) => {
+  const orderRequest: WechatCreateOrderRequest = {
+    outTradeNo: `JSAPI_${Date.now()}`,
+    totalAmount: 299, // 2.99元
+    subject: '会员充值',
+    body: '购买VIP会员服务',
+    openid, // 用户的 openid，必填
+    clientIp: '192.168.1.100',
+  };
+
+  try {
+    const result = await paymentManager.createOrder('wechat.jsapi', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 微信JSAPI支付订单创建成功');
+      const payParams = result.paymentData?.payParams;
+      
+      // 在小程序中调用支付
+      // wx.requestPayment({
+      //   timeStamp: payParams.timeStamp,
+      //   nonceStr: payParams.nonceStr,
+      //   package: payParams.package,
+      //   signType: payParams.signType,
+      //   paySign: payParams.paySign,
+      //   success: (res) => console.log('支付成功', res),
+      //   fail: (err) => console.log('支付失败', err)
+      // });
+      
+      return payParams;
+    } else {
+      console.error('❌ 创建订单失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 创建订单异常:', error);
+  }
+};
+```
+
+### 微信支付 H5 支付
+
+```typescript
+import { WechatCreateOrderRequest } from 'paystream';
+
+// 创建 H5 支付订单
+const createH5Order = async () => {
+  const orderRequest: WechatCreateOrderRequest = {
+    outTradeNo: `H5_${Date.now()}`,
+    totalAmount: 1999, // 19.99元
+    subject: '在线课程',
+    body: 'JavaScript高级教程',
+    clientIp: '192.168.1.100',
+    sceneInfo: {
+      h5Info: {
+        type: 'Wap',
+        appName: '我的在线教育平台',
+        appUrl: 'https://my-education.com',
+      },
+    },
+  };
+
+  try {
+    const result = await paymentManager.createOrder('wechat.h5', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 微信H5支付订单创建成功');
+      const payUrl = result.paymentData?.payUrl;
+      
+      // 跳转到支付页面
+      // window.location.href = payUrl;
+      
+      return payUrl;
+    } else {
+      console.error('❌ 创建订单失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 创建订单异常:', error);
+  }
+};
+```
+
+### 支付宝扫码支付
+
+```typescript
+import { AlipayCreateOrderRequest } from 'paystream';
+
+// 创建支付宝扫码支付订单
+const createAlipayQROrder = async () => {
+  const orderRequest: AlipayCreateOrderRequest = {
+    outTradeNo: `ALIPAY_${Date.now()}`,
+    totalAmount: 500, // 5元
+    subject: '数字商品',
+    body: '虚拟物品购买',
+    timeExpire: 30,
+    productCode: 'FAST_INSTANT_TRADE_PAY',
+  };
+
+  try {
+    const result = await paymentManager.createOrder('alipay.qrcode', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 支付宝扫码支付订单创建成功');
+      console.log('二维码链接:', result.paymentData?.qrCode);
+      
+      return result.paymentData?.qrCode;
+    } else {
+      console.error('❌ 创建订单失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 创建订单异常:', error);
+  }
+};
+```
+
+### 支付宝 H5 支付
+
+```typescript
+// 创建支付宝 H5 支付订单
+const createAlipayH5Order = async () => {
+  const orderRequest: AlipayCreateOrderRequest = {
+    outTradeNo: `ALIPAY_H5_${Date.now()}`,
+    totalAmount: 888, // 8.88元
+    subject: '手机充值',
+    body: '100元话费充值',
+    returnUrl: 'https://your-domain.com/payment/return',
+  };
+
+  try {
+    const result = await paymentManager.createOrder('alipay.h5', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 支付宝H5支付订单创建成功');
+      const payUrl = result.paymentData?.payUrl;
+      
+      // 跳转到支付页面
+      // window.location.href = payUrl;
+      
+      return payUrl;
+    } else {
+      console.error('❌ 创建订单失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 创建订单异常:', error);
+  }
+};
+```
+
+## 🔔 设置事件监听器
 
 ```typescript
 // 全局事件监听器
@@ -91,6 +285,91 @@ paymentManager.onPending(async (notification) => {
   console.log('⏳ 支付待处理:', notification.outTradeNo);
   await updateOrderStatus(notification.outTradeNo, 'pending');
 });
+```
+
+## 🔍 订单查询
+
+```typescript
+import { QueryOrderRequest } from 'paystream';
+
+// 查询微信支付订单
+const queryWechatOrder = async (outTradeNo: string) => {
+  const queryRequest: QueryOrderRequest = {
+    outTradeNo,
+  };
+
+  try {
+    const result = await paymentManager.queryOrder('wechat', queryRequest);
+    
+    if (result.success && result.orderInfo) {
+      console.log('✅ 订单查询成功');
+      console.log('订单状态:', result.orderInfo.tradeStatus);
+      console.log('支付金额:', result.orderInfo.totalAmount);
+      console.log('支付时间:', result.orderInfo.payTime);
+      
+      return result.orderInfo;
+    } else {
+      console.log('❌ 订单查询失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 查询订单异常:', error);
+  }
+};
+
+// 查询支付宝订单
+const queryAlipayOrder = async (tradeNo: string) => {
+  const queryRequest: QueryOrderRequest = {
+    tradeNo,
+  };
+
+  const result = await paymentManager.queryOrder('alipay', queryRequest);
+  return result;
+};
+```
+
+## 💰 退款操作
+
+```typescript
+import { RefundRequest } from 'paystream';
+
+// 微信支付退款
+const refundWechatOrder = async (outTradeNo: string, refundAmount: number) => {
+  const refundRequest: RefundRequest = {
+    outTradeNo,
+    outRefundNo: `REFUND_${Date.now()}`,
+    refundAmount, // 退款金额，单位：分
+    refundReason: '用户申请退款',
+  };
+
+  try {
+    const result = await paymentManager.refund('wechat', refundRequest);
+    
+    if (result.success && result.refundInfo) {
+      console.log('✅ 退款申请成功');
+      console.log('退款单号:', result.refundInfo.refundId);
+      console.log('退款状态:', result.refundInfo.refundStatus);
+      
+      return result.refundInfo;
+    } else {
+      console.log('❌ 退款申请失败:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ 退款申请异常:', error);
+  }
+};
+
+// 支付宝退款
+const refundAlipayOrder = async (tradeNo: string, refundAmount: number) => {
+  const refundRequest: RefundRequest = {
+    tradeNo,
+    outRefundNo: `ALIPAY_REFUND_${Date.now()}`,
+    refundAmount,
+    refundReason: '商品质量问题',
+  };
+
+  const result = await paymentManager.refund('alipay', refundRequest);
+  return result;
+};
 ```
 
 ## 📋 Next.js 集成

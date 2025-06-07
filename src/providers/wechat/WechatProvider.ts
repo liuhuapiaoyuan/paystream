@@ -9,8 +9,22 @@ import {
   PaymentError,
   PaymentErrorCode,
   WechatPayMethod,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  RefundRequest,
+  RefundResponse,
+  WechatCreateOrderRequest,
 } from '../../types/payment';
 import { aesGcmDecrypt, verifyWechatSignature } from '../../utils/crypto';
+import {
+  WechatPayV3Client,
+  generateJSAPIPayParams,
+  WechatNativeOrderParams,
+  WechatJSAPIOrderParams,
+  WechatH5OrderParams,
+} from '../../utils/wechat';
 
 /**
  * 微信支付回调数据结构
@@ -106,8 +120,16 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
     'app',
   ];
 
+  private wechatClient: WechatPayV3Client;
+
   constructor(config: WechatProviderConfig) {
     super(config, 'wechat');
+    this.wechatClient = new WechatPayV3Client(
+      config.privateKey,
+      config.mchId,
+      config.serialNo,
+      config.sandbox
+    );
   }
 
   /**
@@ -299,10 +321,10 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
   /**
    * 生成失败响应
    */
-  generateFailureResponse(_error?: string): object {
+  generateFailureResponse(error?: string): object {
     return {
       code: 'FAIL',
-      message: '失败',
+      message: error || '处理失败',
     };
   }
 
@@ -353,5 +375,240 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
         'Content-Type': 'application/json',
       },
     };
+  }
+
+  /**
+   * 创建支付订单
+   */
+  async createOrder(
+    method: string,
+    request: CreateOrderRequest
+  ): Promise<CreateOrderResponse> {
+    try {
+      const wechatMethod = method.replace('wechat.', '') as WechatPayMethod;
+
+      if (!this.supportedMethods.includes(wechatMethod)) {
+        throw new Error(`不支持的支付方式: ${method}`);
+      }
+
+      // 确保 notify_url 不为空
+      if (!request.notifyUrl) {
+        throw new Error('notify_url 是必需的');
+      }
+
+      // 构建微信支付订单参数
+      const baseParams = {
+        appid: this.config.appId,
+        mchid: this.config.mchId,
+        description: request.subject,
+        out_trade_no: request.outTradeNo,
+        notify_url: request.notifyUrl,
+        amount: {
+          total: request.totalAmount, // 单位为分
+          currency: 'CNY',
+        },
+        attach: request.body,
+        // 处理时间过期，转换为 ISO 时间字符串
+        ...(request.timeExpire && {
+          time_expire: new Date(
+            Date.now() + request.timeExpire * 60 * 1000
+          ).toISOString(),
+        }),
+      };
+
+      let result: any;
+      const paymentData: any = {};
+
+      switch (wechatMethod) {
+        case 'native': {
+          const params: WechatNativeOrderParams = {
+            ...baseParams,
+            scene_info: {
+              payer_client_ip: request.clientIp || '127.0.0.1',
+            },
+          };
+          result = await this.wechatClient.createNativeOrder(params);
+          paymentData.qrCode = result.code_url;
+          break;
+        }
+
+        case 'jsapi': {
+          if (!request.openid) {
+            throw new Error('JSAPI支付需要提供openid');
+          }
+          const params: WechatJSAPIOrderParams = {
+            ...baseParams,
+            payer: {
+              openid: request.openid,
+            },
+            scene_info: {
+              payer_client_ip: request.clientIp || '127.0.0.1',
+            },
+          };
+          result = await this.wechatClient.createJSAPIOrder(params);
+          // 生成前端支付参数
+          paymentData.payParams = generateJSAPIPayParams(
+            this.config.appId,
+            result.prepay_id,
+            this.config.privateKey
+          );
+          break;
+        }
+
+        case 'h5': {
+          const wechatRequest = request as WechatCreateOrderRequest;
+          const params: WechatH5OrderParams = {
+            ...baseParams,
+            scene_info: {
+              payer_client_ip: request.clientIp || '127.0.0.1',
+              h5_info: {
+                type: 'Wap',
+                app_name:
+                  wechatRequest.sceneInfo?.h5Info?.appName || 'PayStream',
+                app_url:
+                  wechatRequest.sceneInfo?.h5Info?.appUrl ||
+                  'https://example.com',
+              },
+            },
+          };
+          result = await this.wechatClient.createH5Order(params);
+          paymentData.payUrl = result.h5_url;
+          break;
+        }
+
+        default:
+          throw new Error(`不支持的微信支付方式: ${wechatMethod}`);
+      }
+
+      return {
+        success: true,
+        tradeNo: result.prepay_id || result.code_url || result.h5_url,
+        paymentData,
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '创建订单失败',
+      };
+    }
+  }
+
+  /**
+   * 查询支付订单
+   */
+  async queryOrder(request: QueryOrderRequest): Promise<QueryOrderResponse> {
+    try {
+      let result: any;
+
+      if (request.tradeNo) {
+        // 通过微信支付订单号查询
+        result = await this.wechatClient.queryOrderByTransactionId(
+          request.tradeNo,
+          this.config.mchId
+        );
+      } else if (request.outTradeNo) {
+        // 通过商户订单号查询
+        result = await this.wechatClient.queryOrderByOutTradeNo(
+          request.outTradeNo,
+          this.config.mchId
+        );
+      } else {
+        throw new Error('必须提供 tradeNo 或 outTradeNo');
+      }
+
+      // 映射交易状态
+      const tradeStatus = this.mapTradeStatus(result.trade_state);
+
+      return {
+        success: true,
+        orderInfo: {
+          tradeStatus,
+          outTradeNo: result.out_trade_no,
+          tradeNo: result.transaction_id,
+          totalAmount: result.amount.total,
+          receiptAmount: result.amount.payer_total,
+          payerId: result.payer.openid,
+          createTime: new Date().toISOString(), // 微信支付V3不返回创建时间
+          payTime: result.success_time || new Date().toISOString(),
+        },
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '查询订单失败',
+      };
+    }
+  }
+
+  /**
+   * 发起退款
+   */
+  async refund(request: RefundRequest): Promise<RefundResponse> {
+    try {
+      // 首先查询订单信息获取总金额
+      let totalAmount: number;
+
+      if (request.tradeNo || request.outTradeNo) {
+        const queryResult = await this.queryOrder({
+          tradeNo: request.tradeNo,
+          outTradeNo: request.outTradeNo,
+        });
+
+        if (!queryResult.success || !queryResult.orderInfo) {
+          throw new Error('查询原订单失败，无法确定总金额');
+        }
+
+        totalAmount = queryResult.orderInfo.totalAmount;
+      } else {
+        throw new Error('必须提供 tradeNo 或 outTradeNo');
+      }
+
+      const params = {
+        out_refund_no: request.outRefundNo,
+        reason: request.refundReason || '商户退款',
+        amount: {
+          refund: request.refundAmount,
+          total: totalAmount,
+          currency: 'CNY',
+        },
+        notify_url: request.notifyUrl,
+      };
+
+      // 根据提供的参数选择查询方式
+      if (request.tradeNo) {
+        (params as any).transaction_id = request.tradeNo;
+      } else if (request.outTradeNo) {
+        (params as any).out_trade_no = request.outTradeNo;
+      }
+
+      const result = await this.wechatClient.createRefund(params);
+
+      // 映射退款状态
+      let refundStatus: 'SUCCESS' | 'FAIL' | 'PENDING' = 'PENDING';
+      if (result.status === 'SUCCESS') {
+        refundStatus = 'SUCCESS';
+      } else if (result.status === 'CLOSED') {
+        refundStatus = 'FAIL';
+      }
+
+      return {
+        success: true,
+        refundInfo: {
+          refundId: result.refund_id,
+          outRefundNo: result.out_refund_no,
+          refundAmount: result.amount.refund,
+          refundStatus,
+          refundTime: result.success_time || result.create_time,
+        },
+        raw: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '退款失败',
+      };
+    }
   }
 }

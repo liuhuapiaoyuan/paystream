@@ -1,9 +1,15 @@
 import {
-  UnifiedPaymentNotification,
+  PaymentMethod,
   PaymentNotifyPayload,
+  UnifiedPaymentNotification,
   PaymentError,
   PaymentErrorCode,
-  PaymentMethod,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  RefundRequest,
+  RefundResponse,
 } from '../types/payment';
 import { PaymentConfig } from '../types/config';
 import { HookManager, callStatusHooks } from './hooks';
@@ -245,8 +251,8 @@ export class PaymentManagerV2 {
    * @param name Provider 名称
    * @returns Provider 实例或 undefined
    */
-  getProviderInstance(name: string): BaseProvider | undefined {
-    return this.providers.get(name);
+  getProviderInstance(providerName: string): BaseProvider | undefined {
+    return this.providers.get(providerName);
   }
 
   /**
@@ -397,6 +403,150 @@ export class PaymentManagerV2 {
 
     if (this.config.global?.enableLog) {
       console.log('🗑️ PaymentManager 已销毁');
+    }
+  }
+
+  /**
+   * 创建支付订单
+   * @param method 支付方式
+   * @param request 订单创建请求
+   * @returns 订单创建响应
+   */
+  async createOrder(
+    method: PaymentMethod,
+    request: CreateOrderRequest
+  ): Promise<CreateOrderResponse> {
+    try {
+      // 解析 Provider 名称
+      const providerName = this.parseProviderName(method);
+
+      // 获取 Provider 实例
+      const provider = this.getProvider(providerName);
+
+      // 验证支付方式是否支持
+      if (!provider.isSupportedMethod(method)) {
+        throw new PaymentError(
+          PaymentErrorCode.INVALID_PARAMS,
+          `${providerName} Provider 不支持支付方式: ${method}`
+        );
+      }
+
+      // 使用 Provider 创建订单
+      const result = await provider.createOrder(method, request);
+
+      // 记录成功日志
+      if (this.config.global?.enableLog) {
+        console.log(`✅ ${providerName} 创建支付订单成功:`, {
+          outTradeNo: request.outTradeNo,
+          totalAmount: request.totalAmount,
+          method,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      // 记录错误日志
+      if (this.config.global?.enableLog) {
+        console.error('❌ 创建支付订单失败:', error);
+      }
+
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+
+      throw new PaymentError(
+        PaymentErrorCode.UNKNOWN_PROVIDER,
+        '创建支付订单失败',
+        error
+      );
+    }
+  }
+
+  /**
+   * 查询支付订单
+   * @param providerName 支付提供商名称
+   * @param request 订单查询请求
+   * @returns 订单查询响应
+   */
+  async queryOrder(
+    providerName: string,
+    request: QueryOrderRequest
+  ): Promise<QueryOrderResponse> {
+    try {
+      // 获取 Provider 实例
+      const provider = this.getProvider(providerName);
+
+      // 使用 Provider 查询订单
+      const result = await provider.queryOrder(request);
+
+      // 记录成功日志
+      if (this.config.global?.enableLog) {
+        console.log(`✅ ${providerName} 查询支付订单成功:`, {
+          outTradeNo: request.outTradeNo,
+          tradeNo: request.tradeNo,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      // 记录错误日志
+      if (this.config.global?.enableLog) {
+        console.error('❌ 查询支付订单失败:', error);
+      }
+
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+
+      throw new PaymentError(
+        PaymentErrorCode.UNKNOWN_PROVIDER,
+        '查询支付订单失败',
+        error
+      );
+    }
+  }
+
+  /**
+   * 发起退款
+   * @param providerName 支付提供商名称
+   * @param request 退款请求
+   * @returns 退款响应
+   */
+  async refund(
+    providerName: string,
+    request: RefundRequest
+  ): Promise<RefundResponse> {
+    try {
+      // 获取 Provider 实例
+      const provider = this.getProvider(providerName);
+
+      // 使用 Provider 发起退款
+      const result = await provider.refund(request);
+
+      // 记录成功日志
+      if (this.config.global?.enableLog) {
+        console.log(`✅ ${providerName} 发起退款成功:`, {
+          outRefundNo: request.outRefundNo,
+          refundAmount: request.refundAmount,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      // 记录错误日志
+      if (this.config.global?.enableLog) {
+        console.error('❌ 发起退款失败:', error);
+      }
+
+      if (error instanceof PaymentError) {
+        throw error;
+      }
+
+      throw new PaymentError(
+        PaymentErrorCode.UNKNOWN_PROVIDER,
+        '发起退款失败',
+        error
+      );
     }
   }
 }

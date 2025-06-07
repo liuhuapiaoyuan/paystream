@@ -1,4 +1,9 @@
-import { createDecipheriv, createVerify, createSign } from 'crypto';
+import {
+  createDecipheriv,
+  createVerify,
+  createSign,
+  randomBytes,
+} from 'crypto';
 import { PaymentError, PaymentErrorCode } from '../types/payment';
 
 /**
@@ -186,10 +191,8 @@ export function verifyWechatSignature(
 
 /**
  * 生成随机字符串
- * @param length 长度
- * @returns 随机字符串
  */
-export function generateNonce(length: number = 32): string {
+export function generateNonce(length = 32): string {
   const chars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -200,20 +203,77 @@ export function generateNonce(length: number = 32): string {
 }
 
 /**
- * 生成时间戳
- * @returns 当前时间戳（秒）
+ * 生成时间戳（秒）
  */
 export function generateTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
 
 /**
- * URL 安全的 Base64 编码
- * @param str 待编码字符串
- * @returns Base64 编码结果
+ * 生成随机订单号
+ */
+export function generateOrderNo(prefix = ''): string {
+  const timestamp = Date.now();
+  const random = randomBytes(4).toString('hex').toUpperCase();
+  return `${prefix}${timestamp}${random}`;
+}
+
+/**
+ * 格式化金额（分转元）
+ */
+export function formatAmount(amount: number): string {
+  return (amount / 100).toFixed(2);
+}
+
+/**
+ * 解析金额（元转分）
+ */
+export function parseAmount(amount: string | number): number {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return Math.round(num * 100);
+}
+
+/**
+ * 验证订单号格式
+ */
+export function validateOrderNo(orderNo: string): boolean {
+  // 订单号应该是6-32位字符，只能包含数字、字母、下划线、横线
+  const regex = /^[a-zA-Z0-9_-]{6,32}$/;
+  return regex.test(orderNo);
+}
+
+/**
+ * 生成UUID
+ */
+export function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * 安全比较字符串（防止时序攻击）
+ */
+export function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+
+  return result === 0;
+}
+
+/**
+ * URL安全的Base64编码
  */
 export function base64UrlEncode(str: string): string {
-  return Buffer.from(str)
+  return Buffer.from(str, 'utf8')
     .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -221,14 +281,11 @@ export function base64UrlEncode(str: string): string {
 }
 
 /**
- * URL 安全的 Base64 解码
- * @param str Base64 编码字符串
- * @returns 解码结果
+ * URL安全的Base64解码
  */
 export function base64UrlDecode(str: string): string {
-  // 补齐 padding
-  str += '='.repeat((4 - (str.length % 4)) % 4);
-  // 替换字符
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  return Buffer.from(str, 'base64').toString();
+  // 补齐padding
+  const padding = '='.repeat((4 - (str.length % 4)) % 4);
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/') + padding;
+  return Buffer.from(base64, 'base64').toString('utf8');
 }
