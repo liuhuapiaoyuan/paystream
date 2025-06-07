@@ -438,7 +438,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
   ): Promise<CreateOrderResponse> {
     try {
       const alipayMethod = method.replace('alipay.', '') as AlipayMethod;
-      
+
       if (!this.supportedMethods.includes(alipayMethod)) {
         throw new Error(`不支持的支付方式: ${method}`);
       }
@@ -497,7 +497,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
       product_code: 'FACE_TO_FACE_PAYMENT',
       timeout_express: request.timeExpire ? `${request.timeExpire}m` : '30m',
     };
-    
+
     return await this.alipayClient.tradeCreate(params);
   }
 
@@ -514,7 +514,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
       time_expire: request.timeExpire ? `${request.timeExpire}m` : '30m',
       quit_url: request.returnUrl || 'https://example.com',
     };
-    
+
     return await this.alipayClient.tradeWapPay(params);
   }
 
@@ -532,7 +532,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
       return_url: request.returnUrl,
       notify_url: request.notifyUrl,
     };
-    
+
     return await this.alipayClient.tradePagePay(params);
   }
 
@@ -548,7 +548,7 @@ export class AlipayProvider extends BaseProvider<AlipayProviderConfig> {
       product_code: 'QUICK_MSECURITY_PAY',
       timeout_express: request.timeExpire ? `${request.timeExpire}m` : '30m',
     };
-    
+
     return await this.alipayClient.tradeCreate(params);
   }
 
