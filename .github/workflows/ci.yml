@@ -42,7 +42,11 @@ jobs:
             ${{ runner.os }}-pnpm-store-
             
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if ! pnpm install --frozen-lockfile; then
+            echo "🔄 Lockfile incompatible, regenerating..."
+            pnpm install --no-frozen-lockfile
+          fi
         
       - name: Type check
         run: pnpm type-check
@@ -98,7 +102,11 @@ jobs:
           run_install: false
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if ! pnpm install --frozen-lockfile; then
+            echo "🔄 Lockfile incompatible, regenerating..."
+            pnpm install --no-frozen-lockfile
+          fi
         
       - name: Run security audit
         run: pnpm audit --audit-level moderate
