@@ -16,13 +16,21 @@ import { aesGcmDecrypt, verifyWechatSignature } from '../../utils/crypto';
  * 微信支付回调数据结构
  */
 interface WechatNotification {
+  /** 通知ID */
   id: string;
+  /** 通知创建时间 */
   create_time: string;
+  /** 通知事件类型 */
   event_type: string;
+  /** 通知资源类型 */
   resource_type: string;
+  /** 通知资源数据 */
   resource: {
+    /** 加密数据 */
     ciphertext: string;
+    /** 随机串 */
     nonce: string;
+    /** 附加数据 */
     associated_data: string;
   };
 }
@@ -31,23 +39,40 @@ interface WechatNotification {
  * 解密后的微信支付数据
  */
 interface WechatTransactionData {
+  /** 商户号 */
   mchid: string;
+  /** 应用ID */
   appid: string;
+  /** 商户订单号 */
   out_trade_no: string;
+  /** 微信支付订单号 */
   transaction_id: string;
+  /** 交易类型 */
   trade_type: string;
+  /** 交易状态 */
   trade_state: string;
+  /** 交易状态描述 */
   trade_state_desc: string;
+  /** 付款银行类型 */
   bank_type: string;
+  /** 附加数据 */
   attach?: string;
+  /** 支付完成时间 */
   success_time: string;
+  /** 支付者信息 */
   payer: {
+    /** 用户标识 */
     openid: string;
   };
+  /** 订单金额信息 */
   amount: {
+    /** 订单总金额 */
     total: number;
+    /** 用户支付金额 */
     payer_total: number;
+    /** 货币类型 */
     currency: string;
+    /** 用户支付币种 */
     payer_currency: string;
   };
 }
