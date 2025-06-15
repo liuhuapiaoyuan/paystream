@@ -1,7 +1,7 @@
 import { createSign } from 'crypto';
 import { PaymentError, PaymentErrorCode } from '../types/payment';
-import { HttpClient } from './http';
 import { generateNonce, generateTimestamp } from './crypto';
+import { HttpClient } from './http';
 
 /**
  * 微信支付V3 API基础URL
@@ -67,12 +67,11 @@ export class WechatPayV3Signer {
     );
 
     return [
-      'WECHATPAY2-SHA256-RSA2048',
-      `mchid="${this.mchId}"`,
+      `WECHATPAY2-SHA256-RSA2048 mchid="${this.mchId}"`,
       `nonce_str="${nonce}"`,
+      `signature="${signature}"`,
       `timestamp="${timestamp}"`,
       `serial_no="${this.serialNo}"`,
-      `signature="${signature}"`,
     ].join(',');
   }
 }
@@ -130,8 +129,22 @@ export class WechatPayV3Client {
         headers,
         data: data || undefined,
       });
+      console.log(response);
 
       if (response.status >= 400) {
+        // 如果有data 有code 有message 则使用data.message
+        if (
+          response.data &&
+          typeof response.data === 'object' &&
+          'code' in response.data &&
+          'message' in response.data
+        ) {
+          throw new PaymentError(
+            PaymentErrorCode.NETWORK_ERROR,
+            `微信支付API请求失败: ${response.data.code} ${response.data.message}`,
+            response.data.message
+          );
+        }
         throw new PaymentError(
           PaymentErrorCode.NETWORK_ERROR,
           `微信支付API请求失败: ${response.status} ${response.statusText}`,

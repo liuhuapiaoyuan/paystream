@@ -144,6 +144,14 @@ export interface CreateOrderRequest {
   openid?: string;
   /** 用户 IP 地址 */
   clientIp?: string;
+  /**
+   * 付款码（付款码支付必填）
+   */
+  authCode?: string;
+  /**
+   * 设备信息（付款码支付必填）
+   */
+  deviceInfo?: string;
 }
 
 /**

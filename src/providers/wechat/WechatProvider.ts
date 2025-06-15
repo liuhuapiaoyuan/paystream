@@ -29,6 +29,7 @@ import {
   WechatH5OrderResponse,
   WechatOrderQueryResponse,
 } from '../../utils/wechat';
+import { WechatPayV2Client } from '@/utils/wechat.v2';
 
 /**
  * 微信支付回调数据结构
@@ -105,6 +106,8 @@ export interface WechatProviderConfig extends BaseProviderConfig {
   mchId: string;
   /** API v3 密钥 */
   apiV3Key: string;
+  /** API v2 密钥 */
+  apiV2Key: string;
   /** 私钥内容或路径 */
   privateKey: string;
   /** 证书序列号 */
@@ -392,7 +395,11 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
       const wechatMethod = method.replace('wechat.', '') as WechatPayMethod;
 
       if (!this.supportedMethods.includes(wechatMethod)) {
-        throw new Error(`不支持的支付方式: ${method}`);
+        throw new Error(
+          `不支持的支付方式: ${method}, 支持的支付方式: ${this.supportedMethods
+            .map(method => `wechat.${method}`)
+            .join(', ')}`
+        );
       }
 
       // 确保 notify_url 不为空
@@ -458,6 +465,41 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
       },
     };
     return await this.wechatClient.createNativeOrder(params);
+  }
+
+  /**
+   * 利用v2接口来支持付款码条码付款
+   * 付款码支付必填参数：authCode、deviceInfo
+   */
+  public async createMicropay(request: CreateOrderRequest) {
+    // 判断 apiV2Key
+    if (!this.config.apiV2Key) {
+      throw new Error('扫码支付必须配置apiV2Key');
+    }
+
+    const client = new WechatPayV2Client(
+      this.config.appId,
+      this.config.mchId,
+      this.config.apiV2Key,
+      'MD5'
+    );
+    if (!request.authCode) {
+      throw new Error('authCode is required');
+    }
+    if (!request.deviceInfo) {
+      throw new Error('deviceInfo is required');
+    }
+
+    return client.micropay({
+      auth_code: request.authCode,
+      body: request.subject,
+      out_trade_no: request.outTradeNo,
+      total_fee: request.totalAmount,
+      spbill_create_ip: request.clientIp || '127.0.0.1',
+      device_info: request.deviceInfo,
+      detail: request.body,
+    });
+
   }
 
   /**
