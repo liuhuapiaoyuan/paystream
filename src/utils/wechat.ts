@@ -129,7 +129,6 @@ export class WechatPayV3Client {
         headers,
         data: data || undefined,
       });
-      console.log(response);
 
       if (response.status >= 400) {
         // 如果有data 有code 有message 则使用data.message

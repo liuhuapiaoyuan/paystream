@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WechatPayV2Client } from '../wechat.v2';
+import { WechatPayV2Client } from '../wechat-v2';
 
 describe('WechatPayV2Client - generateSignature', () => {
   // 用户提供的测试参数

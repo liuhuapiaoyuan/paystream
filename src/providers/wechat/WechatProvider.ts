@@ -29,7 +29,7 @@ import {
   WechatH5OrderResponse,
   WechatOrderQueryResponse,
 } from '../../utils/wechat';
-import { WechatPayV2Client } from '@/utils/wechat.v2';
+import { WechatPayV2Client } from '../../utils/wechat-v2';
 
 /**
  * 微信支付回调数据结构
@@ -106,8 +106,8 @@ export interface WechatProviderConfig extends BaseProviderConfig {
   mchId: string;
   /** API v3 密钥 */
   apiV3Key: string;
-  /** API v2 密钥 */
-  apiV2Key: string;
+  /** API v2 密钥 [可选，扫码枪支付必填] */
+  apiV2Key?: string;
   /** 私钥内容或路径 */
   privateKey: string;
   /** 证书序列号 */
@@ -439,10 +439,7 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
 
       return {
         success: true,
-        tradeNo:
-          (result as WechatJSAPIOrderResponse).prepay_id ||
-          (result as WechatNativeOrderResponse).code_url ||
-          (result as WechatH5OrderResponse).h5_url,
+        tradeNo: request.outTradeNo,
         paymentData,
         raw: result,
       };
