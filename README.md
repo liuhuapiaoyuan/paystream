@@ -12,8 +12,8 @@ PayStream V2 是一个强大的 TypeScript 支付库，采用现代面向对象�
 
 - 🏗️ **面向对象架构** - 基于 Provider 抽象的清晰设计
 - 💳 **统一支付接口** - 支持微信支付和支付宝的订单创建、查询、退款
+- 📱 **多种支付方式** - Native扫码、JSAPI、H5、APP、**付款码支付**等支付方式
 - 🔒 **类型安全** - 完整的 TypeScript 类型支持
-- 📱 **多种支付方式** - Native扫码、JSAPI、H5、APP等支付方式
 - 🎯 **精简设计** - 专注核心功能，移除冗余代码
 - 📊 **详细日志** - 可配置的调试和性能监控
 - 🔧 **自定义响应** - 灵活的响应构建器接口
@@ -45,6 +45,7 @@ const config: PaymentConfig = {
     appId: 'wx1234567890abcdef',
     mchId: '1234567890',
     apiV3Key: 'your-32-character-api-v3-key',
+    apiV2Key: 'your-32-character-api-v2-key', // 付款码支付必需
     privateKey: 'your-private-key',
     serialNo: 'your-certificate-serial-no',
     platformCertificate: 'platform-certificate', // 可选
@@ -71,6 +72,64 @@ const paymentManager = createPaymentManagerV2(config);
 ```
 
 ## 💳 支付订单创建
+
+### 微信支付付款码支付 🆕
+
+```typescript
+import { CreateOrderRequest } from 'paystream';
+
+// 创建付款码支付订单（适用于线下POS机、收银台等场景）
+const createMicropayOrder = async (authCode: string, deviceInfo: string) => {
+  const orderRequest: CreateOrderRequest = {
+    outTradeNo: `MICROPAY_${Date.now()}`,
+    totalAmount: 100, // 1元，单位：分
+    subject: '线下商品购买',
+    body: '付款码支付测试商品',
+    authCode, // 用户付款码（18位数字）
+    deviceInfo, // 设备号（如：POS_001）
+    clientIp: '192.168.1.100',
+  };
+
+  try {
+    const result = await paymentManager.createOrder('wechat.micropay', orderRequest);
+    
+    if (result.success) {
+      console.log('💳 微信付款码支付成功');
+      console.log('交易号:', result.tradeNo);
+      console.log('支付时间:', result.raw?.time_end);
+      
+      // 付款码支付是同步返回结果的
+      return {
+        success: true,
+        tradeNo: result.tradeNo,
+        payTime: result.raw?.time_end
+      };
+    } else {
+      console.error('❌ 付款码支付失败:', result.error);
+      
+      // 处理常见错误
+      if (result.error?.includes('USERPAYING')) {
+        console.log('⏳ 用户支付中，请稍候...');
+        // 可以轮询查询支付结果
+      } else if (result.error?.includes('SYSTEMERROR')) {
+        console.log('🔄 系统错误，正在查询订单状态...');
+        // 系统会自动查询订单状态
+      }
+      
+      return { success: false, error: result.error };
+    }
+  } catch (error) {
+    console.error('❌ 付款码支付异常:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// 使用示例
+const paymentResult = await createMicropayOrder(
+  '134567890123456789', // 用户展示的付款码
+  'POS_001' // 收银设备编号
+);
+```
 
 ### 微信支付 Native 扫码支付
 
@@ -531,6 +590,44 @@ console.log('微信 Native 支付支持:', isSupported);
 ```
 
 ## 📊 数据格式
+
+### 支持的支付方式
+
+PayStream V2 支持以下支付方式：
+
+#### 微信支付
+- `wechat.native` - Native 扫码支付（用户扫商户二维码）
+- `wechat.jsapi` - JSAPI 支付（小程序、公众号内支付）
+- `wechat.h5` - H5 支付（手机浏览器支付）
+- `wechat.app` - APP 支付（移动应用内支付）
+- `wechat.micropay` - **付款码支付**（商户扫用户付款码）🆕
+
+#### 支付宝
+- `alipay.qrcode` - 扫码支付（用户扫商户二维码）
+- `alipay.pc` - 电脑网站支付
+- `alipay.h5` - 手机网站支付
+- `alipay.app` - APP 支付
+
+### 付款码支付特性 🆕
+
+付款码支付是线下收银场景的重要支付方式，具有以下特点：
+
+- **同步支付**: 支付结果立即返回，无需异步回调
+- **适用场景**: POS机、收银台、自助设备等线下场景
+- **用户体验**: 用户出示付款码，商户扫码完成支付
+- **智能重试**: 自动处理支付中状态和系统错误
+- **状态轮询**: 支持异步状态查询和订单撤销
+
+```typescript
+// 检查是否支持付款码支付
+const supportsMicropay = paymentManager.isSupportedMethod('wechat.micropay');
+console.log('支持付款码支付:', supportsMicropay);
+
+// 获取所有支持的支付方式
+const allMethods = paymentManager.getSupportedMethods();
+console.log('支持的支付方式:', allMethods);
+// 输出: ['wechat.native', 'wechat.jsapi', 'wechat.h5', 'wechat.app', 'wechat.micropay', ...]
+```
 
 ### 统一支付通知格式
 

@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2024-01-15
+
+### 🚀 新增功能 - 付款码支付支持
+
+#### Added
+- **微信支付付款码支付**: 完整的微信支付v2付款码支付功能
+  - `WechatPayV2Client.micropay()`: 付款码支付API调用
+  - `WechatPayV2Client.processMicropay()`: 智能付款码支付流程处理
+  - 支持付款码支付重试逻辑和状态轮询
+  - 自动处理 `SYSTEMERROR` 和 `USERPAYING` 状态
+  - 支持订单查询和撤销操作
+- **WechatProvider 付款码支持**: 
+  - `createMicropay()` 方法支持付款码支付
+  - 集成微信支付v2 API密钥配置
+  - 完整的参数验证和错误处理
+- **付款码支付参数扩展**:
+  - `CreateOrderRequest` 接口新增 `authCode` 和 `deviceInfo` 字段
+  - 支持场景信息 `scene_info` 配置
+  - 支持分账、优惠标记等高级功能
+
+#### Enhanced
+- **类型安全增强**: 
+  - `WechatV2MicropayRequest` 和 `WechatV2MicropayResponse` 接口定义
+  - 完整的付款码支付参数类型支持
+- **错误处理优化**:
+  - 付款码支付特有的错误码处理
+  - 智能重试和状态查询机制
+  - 详细的错误信息和调试日志
+- **性能优化**:
+  - 付款码支付流程优化，减少不必要的API调用
+  - 支持异步状态轮询，避免阻塞
+
+#### Technical Details
+- **微信支付v2 API集成**: 
+  - 支持MD5和HMAC-SHA256签名算法
+  - XML格式请求和响应处理
+  - 完整的签名验证机制
+- **付款码支付流程**:
+  1. 调用 `/pay/micropay` 接口
+  2. 处理 `SYSTEMERROR` - 查询订单状态
+  3. 处理 `USERPAYING` - 轮询支付结果
+  4. 支持订单撤销和错误恢复
+- **配置要求**:
+  - 需要配置 `apiV2Key` 用于微信支付v2 API
+  - 付款码支付必须提供 `authCode` 和 `deviceInfo`
+
+#### Usage Example
+```typescript
+// 微信付款码支付
+const result = await paymentManager.createOrder('wechat.micropay', {
+  outTradeNo: 'ORDER_123456',
+  totalAmount: 100, // 1元
+  subject: '商品名称',
+  authCode: '134567890123456789', // 付款码
+  deviceInfo: 'POS_001', // 设备号
+  clientIp: '192.168.1.100'
+});
+```
+
+### 🔧 配置更新
+- **微信支付配置**: 新增 `apiV2Key` 配置项支持付款码支付
+- **向后兼容**: 保持所有现有API的完全兼容性
+
+---
+
 ## [2.0.0] - 2024-01-01
 
 ### 🚀 Major Changes - V2 架构重构
