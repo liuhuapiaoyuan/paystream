@@ -496,7 +496,6 @@ export class WechatProvider extends BaseProvider<WechatProviderConfig> {
       device_info: request.deviceInfo,
       detail: request.body,
     });
-
   }
 
   /**
