@@ -81,6 +81,9 @@
     "overrides": {
       "esbuild": ">=0.25.0",
       "paystream": "link:C:/Users/Administrator/AppData/Local/pnpm/global/5/node_modules/paystream"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

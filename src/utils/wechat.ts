@@ -117,7 +117,6 @@ export class WechatPayV3Client {
         path,
         body
       ),
-      Accept: 'application/json',
       'Content-Type': 'application/json',
       'User-Agent': 'PayStream/2.0.0',
     };
