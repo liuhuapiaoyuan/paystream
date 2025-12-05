@@ -1,6 +1,6 @@
 {
   "name": "paystream",
-  "version": "2.0.0",
+  "version": "2.2.2",
   "description": "PayStream V2 - 现代化的 TypeScript 统一支付回调处理库，采用面向对象架构",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -57,9 +57,6 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "dependencies": {
-    "paystream": "link:C:/Users/Administrator/AppData/Local/pnpm/global/5/node_modules/paystream"
-  },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
@@ -79,8 +76,7 @@
   "packageManager": "pnpm@10.10.0",
   "pnpm": {
     "overrides": {
-      "esbuild": ">=0.25.0",
-      "paystream": "link:C:/Users/Administrator/AppData/Local/pnpm/global/5/node_modules/paystream"
+      "esbuild": ">=0.25.0" 
     },
     "onlyBuiltDependencies": [
       "esbuild"
